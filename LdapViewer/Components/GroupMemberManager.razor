@@ -1,17 +1,16 @@
-@using LdapViewer.Models
-@using LdapViewer.Services
+@inject IStringLocalizer<Loc> L
 
 <div class="group-manager">
     <div class="d-flex justify-content-between align-items-center mb-2">
-        <strong class="small">Mitglieder verwalten (@_members.Count)</strong>
-        <button class="btn btn-sm btn-outline-secondary py-0 px-1" @onclick="Close">X</button>
+        <strong class="small">@string.Format(L["Group_ManageMembers"], _members.Count)</strong>
+        <button class="btn btn-sm btn-outline-secondary py-0 px-1" @onclick="Close"><i class="bi bi-x-lg"></i></button>
     </div>
 
     @* Add member search *@
     <div class="mb-2">
         <div class="input-group input-group-sm">
             <input type="text" class="form-control" @bind="_searchQuery" @bind:event="oninput"
-                   @onkeydown="HandleSearchKey" placeholder="Benutzer suchen (Name, DN, uid...)" />
+                   @onkeydown="HandleSearchKey" placeholder="@L["Group_SearchUsers"]" />
             <button class="btn btn-primary" @onclick="SearchMembers" disabled="@_searching">
                 @if (_searching)
                 {
@@ -19,7 +18,7 @@
                 }
                 else
                 {
-                    <span>Suchen</span>
+                    <i class="bi bi-search"></i>
                 }
             </button>
         </div>
@@ -40,11 +39,11 @@
                     </div>
                     @if (alreadyMember)
                     {
-                        <span class="badge bg-secondary small">Mitglied</span>
+                        <span class="badge bg-secondary small">@L["Group_Member"]</span>
                     }
                     else
                     {
-                        <button class="btn btn-sm btn-outline-success flex-shrink-0" @onclick="() => AddMember(dn)">+</button>
+                        <button class="btn btn-sm btn-outline-success flex-shrink-0" @onclick="() => AddMember(dn)"><i class="bi bi-plus"></i></button>
                     }
                 </div>
             }
@@ -64,7 +63,7 @@
     <div class="group-member-list">
         @if (_members.Count == 0)
         {
-            <div class="text-muted small p-2">Keine Mitglieder.</div>
+            <div class="text-muted small p-2">@L["Group_NoMembers"]</div>
         }
         else
         {
@@ -72,8 +71,8 @@
             {
                 var memberDn = member;
                 <div class="group-member-item d-flex justify-content-between align-items-center">
-                    <span class="small text-truncate member-link flex-grow-1" @onclick="() => NavigateToMember(memberDn)" title="@memberDn">@GetRdn(memberDn)</span>
-                    <button class="btn btn-sm btn-outline-danger py-0 px-1 flex-shrink-0" @onclick="() => RemoveMember(memberDn)" title="Entfernen">X</button>
+                    <span class="small text-truncate member-link flex-grow-1" @onclick="() => NavigateToMember(memberDn)" title="@memberDn">@LdapEntry.GetRdn(memberDn)</span>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1 flex-shrink-0" @onclick="() => RemoveMember(memberDn)" title="@L["Group_Remove"]"><i class="bi bi-x"></i></button>
                 </div>
             }
         }
@@ -82,8 +81,8 @@
     @* Add by DN directly *@
     <div class="mt-2">
         <div class="input-group input-group-sm">
-            <input type="text" class="form-control" @bind="_directDn" placeholder="DN direkt eingeben" />
-            <button class="btn btn-outline-primary" @onclick="AddDirectMember" disabled="@string.IsNullOrWhiteSpace(_directDn)">Hinzufuegen</button>
+            <input type="text" class="form-control" @bind="_directDn" placeholder="@L["Group_EnterDn"]" />
+            <button class="btn btn-outline-primary" @onclick="AddDirectMember" disabled="@string.IsNullOrWhiteSpace(_directDn)">@L["Group_Add"]</button>
         </div>
     </div>
 </div>
@@ -215,13 +214,13 @@
             };
             await LdapService.ModifyEntry(Entry.Dn, [mod]);
             _members.Add(dn);
-            _success = $"Mitglied hinzugefuegt.";
+            _success = L["Group_MemberAdded"];
             if (OnChanged.HasDelegate)
                 await OnChanged.InvokeAsync();
         }
         catch (Exception ex)
         {
-            _error = $"Fehler: {ex.Message}";
+            _error = string.Format(L["Group_Error"], ex.Message);
         }
     }
 
@@ -247,13 +246,13 @@
             };
             await LdapService.ModifyEntry(Entry.Dn, [mod]);
             _members.Remove(dn);
-            _success = $"Mitglied entfernt.";
+            _success = L["Group_MemberRemoved"];
             if (OnChanged.HasDelegate)
                 await OnChanged.InvokeAsync();
         }
         catch (Exception ex)
         {
-            _error = $"Fehler: {ex.Message}";
+            _error = string.Format(L["Group_Error"], ex.Message);
         }
     }
 
@@ -267,11 +266,5 @@
     {
         if (OnClose.HasDelegate)
             await OnClose.InvokeAsync();
-    }
-
-    private static string GetRdn(string dn)
-    {
-        var idx = dn.IndexOf(',');
-        return idx > 0 ? dn[..idx] : dn;
     }
 }

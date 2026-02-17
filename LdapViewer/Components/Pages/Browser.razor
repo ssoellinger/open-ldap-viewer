@@ -1,80 +1,60 @@
 @page "/browser"
-@using System.Text.Json
-@using LdapViewer.Models
-@using LdapViewer.Services
 @inject ConnectionManager ConnMgr
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject IStringLocalizer<Loc> L
 @rendermode InteractiveServer
 
-<PageTitle>Open LDAP Viewer - Browser</PageTitle>
+<PageTitle>@L["PageTitle_Browser"]</PageTitle>
 
 @if (_reconnecting)
 {
     <div class="container mt-4 text-center">
-        <span class="spinner-border me-2"></span> Verbindung wird wiederhergestellt...
+        <span class="spinner-border me-2"></span> @L["Browser_Reconnecting"]
     </div>
 }
 else if (!ConnMgr.IsConnected)
 {
     <div class="container mt-4">
         <div class="alert alert-warning">
-            Nicht verbunden. <a href="/">Zur Verbindungsseite</a>
+            @L["Browser_NotConnected"] <a href="/">@L["Browser_ToConnectionPage"]</a>
         </div>
     </div>
 }
 else
 {
-    @* Connection Tabs *@
-    @if (ConnMgr.GetAll().Count > 1)
-    {
-        <div class="connection-tabs">
-            @foreach (var conn in ConnMgr.GetAll())
-            {
-                var connId = conn.Id;
-                var connName = conn.Name;
-                var connActive = conn.IsActive;
-                <div class="connection-tab @(connActive ? "active" : "")" @onclick="() => SwitchConnection(connId)">
-                    <span class="connection-tab-label">@connName</span>
-                    <button class="connection-tab-close" @onclick:stopPropagation="true" @onclick="() => CloseConnection(connId)" title="Verbindung schliessen">X</button>
-                </div>
-            }
-            <div class="connection-tab connection-tab-add" @onclick="AddNewConnection" title="Neue Verbindung">
-                +
-            </div>
-        </div>
-    }
+    <ConnectionTabs Connections="ConnMgr.GetAll()" OnSwitch="SwitchConnection" OnClose="CloseConnection" OnAddNew="AddNewConnection" />
 
     <div class="ldap-browser">
         <div class="ldap-tree-panel">
             <div class="panel-header">
-                <strong>Verzeichnisbaum</strong>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="Disconnect" title="Trennen">
-                    Trennen
+                <strong>@L["Browser_DirectoryTree"]</strong>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="Disconnect" title="@L["Browser_Disconnect"]">
+                    <i class="bi bi-box-arrow-right"></i>
                 </button>
             </div>
             <div class="panel-toolbar d-flex gap-1">
-                <button class="btn btn-sm btn-outline-success" @onclick="ShowCreateEntry" title="Neuer Eintrag">
-                    + Neu
+                <button class="btn btn-sm btn-outline-success" @onclick="ShowCreateEntry" title="@L["Editor_NewEntry"]">
+                    <i class="bi bi-plus-lg"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-primary flex-grow-1" @onclick="ExpandAll" disabled="@_expanding">
+                <button class="btn btn-sm btn-outline-primary" @onclick="ExpandAll" disabled="@_expanding" title="@L["Browser_ExpandAll"]">
                     @if (_expanding)
                     {
                         <span class="spinner-border spinner-border-sm me-1"></span>
                     }
-                    Aufklappen
+                    <i class="bi bi-arrows-expand"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="CollapseAll">
-                    Zuklappen
+                <button class="btn btn-sm btn-outline-secondary" @onclick="CollapseAll" title="@L["Browser_CollapseAll"]">
+                    <i class="bi bi-arrows-collapse"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="ExportSubtreeLdif" disabled="@_exporting" title="Gesamten Baum als LDIF exportieren">
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ExportSubtreeLdif" disabled="@_exporting" title="@L["Browser_ExportTreeLdif"]">
                     @if (_exporting)
                     {
                         <span class="spinner-border spinner-border-sm"></span>
                     }
                     else
                     {
-                        <span>LDIF</span>
+                        <span><i class="bi bi-file-earmark-arrow-down"></i> LDIF</span>
                     }
                 </button>
             </div>
@@ -83,7 +63,7 @@ else
             {
                 <div class="bookmark-panel">
                     <div class="bookmark-header d-flex align-items-center justify-content-between px-2 py-1">
-                        <small class="fw-bold">Lesezeichen (@_bookmarks.Count)</small>
+                        <small class="fw-bold">@L["Browser_Bookmarks"] (@_bookmarks.Count)</small>
                         <button class="btn btn-sm btn-link p-0" @onclick="() => _bookmarksExpanded = !_bookmarksExpanded">
                             @(_bookmarksExpanded ? "\u25BE" : "\u25B8")
                         </button>
@@ -94,9 +74,9 @@ else
                         {
                             <div class="bookmark-item @(bm == _selectedDn ? "active" : "")"
                                  @onclick="() => HandleTreeSelect(bm)">
-                                <span class="bookmark-label" title="@bm">@GetRdn(bm)</span>
+                                <span class="bookmark-label" title="@bm">@LdapEntry.GetRdn(bm)</span>
                                 <button class="btn btn-sm btn-link p-0 bookmark-remove" @onclick:stopPropagation="true"
-                                        @onclick="() => ToggleBookmark(bm)">X</button>
+                                        @onclick="() => ToggleBookmark(bm)"><i class="bi bi-x"></i></button>
                             </div>
                         }
                     }
@@ -107,12 +87,12 @@ else
                 @if (_rootEntries == null)
                 {
                     <div class="p-3">
-                        <span class="spinner-border spinner-border-sm me-2"></span> Lade...
+                        <span class="spinner-border spinner-border-sm me-2"></span> @L["Browser_Loading"]
                     </div>
                 }
                 else if (_rootEntries.Count == 0)
                 {
-                    <div class="p-3 text-muted">Keine Eintraege gefunden.</div>
+                    <div class="p-3 text-muted">@L["Browser_NoEntries"]</div>
                 }
                 else
                 {
@@ -124,75 +104,20 @@ else
                                   LdapService="ConnMgr.Active!"
                                   SelectedDn="@_selectedDn"
                                   OnSelect="HandleTreeSelect"
+                                  OnContextMenu="ShowContextMenu"
                                   AutoExpand="true" />
                     }
                 }
             </div>
         </div>
         <div class="ldap-detail-panel">
-            <div class="search-bar">
-                <div class="d-flex gap-1 mb-1">
-                    <select class="form-select form-select-sm" style="width: auto" @bind="_searchAttribute">
-                        <option value="">LDAP-Filter</option>
-                        <option value="cn">CN (Name)</option>
-                        <option value="uid">UID</option>
-                        <option value="sn">SN (Nachname)</option>
-                        <option value="givenName">Vorname</option>
-                        <option value="mail">Mail</option>
-                        <option value="objectClass">ObjectClass</option>
-                        <option value="ou">OU</option>
-                        <option value="telephoneNumber">Telefon</option>
-                        <option value="displayName">Anzeigename</option>
-                    </select>
-                    <div class="input-group input-group-sm flex-grow-1 search-history-dropdown">
-                        <input type="text" class="form-control"
-                               placeholder="@(_searchAttribute == "" ? "z.B. (cn=*Mueller*)" : "Suchbegriff (* als Platzhalter)")"
-                               @bind="_searchValue"
-                               @bind:event="oninput"
-                               @onkeydown="HandleSearchKey"
-                               @onfocus="() => _showSearchHistory = true"
-                               @onblur="HideSearchHistoryDelayed" />
-                        <button class="btn btn-primary" @onclick="ExecuteSearch" disabled="@_searching">
-                            @if (_searching)
-                            {
-                                <span class="spinner-border spinner-border-sm"></span>
-                            }
-                            else
-                            {
-                                <span>Suchen</span>
-                            }
-                        </button>
-                        @if (_searchResults != null)
-                        {
-                            <button class="btn btn-outline-secondary" @onclick="ClearSearch">X</button>
-                        }
-                        @if (_showSearchHistory && _searchHistory.Count > 0)
-                        {
-                            <div class="search-history-list">
-                                @foreach (var item in _searchHistory)
-                                {
-                                    var histItem = item;
-                                    <div class="search-history-item" @onmousedown="() => ApplySearchHistory(histItem)">
-                                        <span>@(string.IsNullOrEmpty(histItem.Attribute) ? histItem.Value : $"{histItem.Attribute}={histItem.Value}")</span>
-                                        @if (!string.IsNullOrEmpty(histItem.Attribute))
-                                        {
-                                            <span class="badge bg-secondary">@histItem.Attribute</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-info">Filter</span>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                        }
-                    </div>
-                </div>
-                @if (!string.IsNullOrEmpty(_searchError))
-                {
-                    <div class="text-danger small">@_searchError</div>
-                }
-            </div>
+            <SearchPanel LdapService="ConnMgr.Active!"
+                         BaseDn="@ConnMgr.Settings!.BaseDn"
+                         HasResults="@(_searchResults != null)"
+                         Error="@_searchError"
+                         OnResults="HandleSearchResults"
+                         OnError="HandleSearchError"
+                         OnClear="HandleSearchClear" />
 
             @if (_showCreateEntry)
             {
@@ -208,24 +133,24 @@ else
                     <div class="search-results-list">
                         <div class="small text-muted p-2">
                             <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span>@_searchResults.Count Ergebnis(se)</span>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="ExportSearchLdif" title="Ergebnisse als LDIF">LDIF</button>
+                                <span>@string.Format(L["Browser_ResultCount"], _searchResults.Count)</span>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="ExportSearchLdif" title="@L["Detail_ExportLdif"]"><i class="bi bi-file-earmark-arrow-down"></i> LDIF</button>
                             </div>
                             @if (_bulkSelected.Count > 0)
                             {
                                 <div class="d-flex gap-1 align-items-center">
-                                    <span class="small fw-bold">@_bulkSelected.Count ausgewaehlt</span>
-                                    <button class="btn btn-sm btn-outline-danger py-0 px-1" @onclick="BulkDelete" disabled="@_bulkDeleting" title="Ausgewaehlte loeschen">
+                                    <span class="small fw-bold">@string.Format(L["Browser_Selected"], _bulkSelected.Count)</span>
+                                    <button class="btn btn-sm btn-outline-danger py-0 px-1" @onclick="BulkDelete" disabled="@_bulkDeleting" title="@L["Browser_DeleteSelected"]">
                                         @if (_bulkDeleting)
                                         {
                                             <span class="spinner-border spinner-border-sm"></span>
                                         }
                                         else
                                         {
-                                            <span>Loeschen</span>
+                                            <i class="bi bi-trash3"></i>
                                         }
                                     </button>
-                                    <button class="btn btn-sm btn-outline-secondary py-0 px-1" @onclick="() => _bulkSelected.Clear()">Keine</button>
+                                    <button class="btn btn-sm btn-outline-secondary py-0 px-1" @onclick="() => _bulkSelected.Clear()" title="@L["Browser_None"]"><i class="bi bi-x-lg"></i></button>
                                 </div>
                             }
                         </div>
@@ -252,7 +177,7 @@ else
                                              LdapService="ConnMgr.Active!"
                                              OnBookmark="ToggleBookmark"
                                              IsBookmarked="@_bookmarks.Contains(_selectedEntry.Dn)"
-                                             OnNavigate="HandleBreadcrumbNavigate"
+                                             OnNavigate="HandleTreeSelect"
                                              OnDeleted="HandleEntryDeleted"
                                              OnModified="HandleEntryModified"
                                              OnCopy="HandleCopyEntry"
@@ -260,7 +185,7 @@ else
                         }
                         else
                         {
-                            <div class="p-3 text-muted">Ergebnis anklicken fuer Details.</div>
+                            <div class="p-3 text-muted">@L["Browser_ClickResult"]</div>
                         }
                     </div>
                 </div>
@@ -271,7 +196,7 @@ else
                                  LdapService="ConnMgr.Active!"
                                  OnBookmark="ToggleBookmark"
                                  IsBookmarked="@_bookmarks.Contains(_selectedEntry.Dn)"
-                                 OnNavigate="HandleBreadcrumbNavigate"
+                                 OnNavigate="HandleTreeSelect"
                                  OnDeleted="HandleEntryDeleted"
                                  OnModified="HandleEntryModified"
                                  OnCopy="HandleCopyEntry"
@@ -280,11 +205,18 @@ else
             else
             {
                 <div class="p-4 text-muted">
-                    Eintrag im Baum auswaehlen, um Details anzuzeigen.
+                    @L["Browser_SelectEntry"]
                 </div>
             }
         </div>
     </div>
+
+    <TreeContextMenu MenuArgs="_contextMenu"
+                     OnClose="CloseContextMenu"
+                     OnNewChild="ContextMenuNewChild"
+                     OnCopy="ContextMenuCopy"
+                     OnCopyDn="ContextMenuCopyDn"
+                     OnDelete="ContextMenuDelete" />
 }
 
 @code {
@@ -299,31 +231,26 @@ else
     private LdapEntry? _copySource;
     private int _treeVersion;
 
-    // Search
-    private string _searchAttribute = "";
-    private string _searchValue = "";
+    // Search results (search execution is in SearchPanel)
     private List<LdapEntry>? _searchResults;
     private string? _searchError;
-    private bool _searching;
 
     // Bulk operations
     private HashSet<string> _bulkSelected = new();
     private bool _bulkDeleting;
 
-    // Search History
-    private List<SearchHistoryItem> _searchHistory = new();
-    private bool _showSearchHistory;
-
     // Bookmarks
     private List<string> _bookmarks = new();
     private bool _bookmarksExpanded = true;
+
+    // Context menu
+    private TreeContextMenuArgs? _contextMenu;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             await LoadBookmarks();
-            await LoadSearchHistory();
 
             if (!ConnMgr.IsConnected)
             {
@@ -340,6 +267,29 @@ else
         {
             await LoadRootEntries();
         }
+    }
+
+    // Search callbacks
+    private void HandleSearchResults(List<LdapEntry> results)
+    {
+        _searchResults = results;
+        _searchError = null;
+        _selectedEntry = null;
+        _selectedDn = null;
+        _showCreateEntry = false;
+        _bulkSelected.Clear();
+    }
+
+    private void HandleSearchError(string error)
+    {
+        _searchError = error;
+        _searchResults = null;
+    }
+
+    private void HandleSearchClear()
+    {
+        _searchResults = null;
+        _searchError = null;
     }
 
     // Connection Tabs
@@ -440,7 +390,7 @@ else
         await LoadRootEntries();
 
         if (errors.Count > 0)
-            _searchError = $"{errors.Count} Fehler beim Loeschen: {errors[0]}";
+            _searchError = string.Format(L["Browser_BulkDeleteErrors"], errors.Count, errors[0]);
 
         if (_selectedDn != null && !(_searchResults?.Any(r => r.Dn == _selectedDn) ?? false))
         {
@@ -460,10 +410,11 @@ else
         await LoadRootEntries();
     }
 
-    private async Task HandleEntryModified(LdapEntry updatedEntry)
+    private Task HandleEntryModified(LdapEntry updatedEntry)
     {
         _selectedEntry = updatedEntry;
         StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private async Task HandleEntryMoved(string newDn)
@@ -471,49 +422,6 @@ else
         _treeVersion++;
         await LoadRootEntries();
         await HandleTreeSelect(newDn);
-    }
-
-    // Search History
-    private async Task LoadSearchHistory()
-    {
-        try
-        {
-            var json = await JS.InvokeAsync<string>("searchHistoryStorage.load");
-            _searchHistory = JsonSerializer.Deserialize<List<SearchHistoryItem>>(json) ?? new();
-        }
-        catch
-        {
-            _searchHistory = new();
-        }
-    }
-
-    private async Task SaveSearchHistory()
-    {
-        var json = JsonSerializer.Serialize(_searchHistory);
-        await JS.InvokeVoidAsync("searchHistoryStorage.save", json);
-    }
-
-    private async Task AddToSearchHistory(string attribute, string value)
-    {
-        _searchHistory.RemoveAll(h => h.Attribute == attribute && h.Value == value);
-        _searchHistory.Insert(0, new SearchHistoryItem { Attribute = attribute, Value = value });
-        if (_searchHistory.Count > 20)
-            _searchHistory = _searchHistory.Take(20).ToList();
-        await SaveSearchHistory();
-    }
-
-    private async Task ApplySearchHistory(SearchHistoryItem item)
-    {
-        _searchAttribute = item.Attribute;
-        _searchValue = item.Value;
-        _showSearchHistory = false;
-        await ExecuteSearch();
-    }
-
-    private async Task HideSearchHistoryDelayed()
-    {
-        await Task.Delay(200);
-        _showSearchHistory = false;
     }
 
     // Bookmarks
@@ -546,43 +454,18 @@ else
         await SaveBookmarks();
     }
 
-    private static string GetRdn(string dn)
-    {
-        var idx = dn.IndexOf(',');
-        if (idx > 0)
-        {
-            var rdn = dn[..idx];
-            var eqIdx = rdn.IndexOf('=');
-            return eqIdx > 0 ? rdn[(eqIdx + 1)..] : rdn;
-        }
-        return dn;
-    }
-
     private async Task TryReconnect()
     {
-        try
+        _reconnecting = true;
+        StateHasChanged();
+
+        if (await ConnMgr.TryReconnectFromStorage(JS))
         {
-            var json = await JS.InvokeAsync<string>("connectionStorage.loadLastConnection");
-            if (string.IsNullOrEmpty(json)) return;
-
-            var settings = JsonSerializer.Deserialize<LdapConnectionSettings>(json);
-            if (settings == null) return;
-
-            _reconnecting = true;
-            StateHasChanged();
-
-            await Task.Run(() => ConnMgr.AddConnection(settings));
             await LoadRootEntries();
         }
-        catch
-        {
-            // Reconnect failed
-        }
-        finally
-        {
-            _reconnecting = false;
-            StateHasChanged();
-        }
+
+        _reconnecting = false;
+        StateHasChanged();
     }
 
     private async Task LoadRootEntries()
@@ -593,7 +476,6 @@ else
             var baseEntry = await ConnMgr.Active!.GetEntry(baseDn);
             if (baseEntry != null)
             {
-                baseEntry.HasChildren = true;
                 _rootEntries = [baseEntry];
             }
             else
@@ -604,7 +486,7 @@ else
         catch (Exception ex)
         {
             _rootEntries = [];
-            Console.Error.WriteLine($"Fehler beim Laden: {ex.Message}");
+            Console.Error.WriteLine(string.Format(L["Browser_LoadError"], ex.Message));
         }
     }
 
@@ -622,13 +504,8 @@ else
         catch (Exception ex)
         {
             _selectedEntry = null;
-            Console.Error.WriteLine($"Fehler beim Laden des Eintrags: {ex.Message}");
+            Console.Error.WriteLine(string.Format(L["Browser_LoadEntryError"], ex.Message));
         }
-    }
-
-    private async Task HandleBreadcrumbNavigate(string dn)
-    {
-        await HandleTreeSelect(dn);
     }
 
     private async Task SelectSearchResult(string dn)
@@ -643,65 +520,6 @@ else
         {
             _selectedEntry = null;
         }
-    }
-
-    private async Task HandleSearchKey(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
-        {
-            await ExecuteSearch();
-        }
-    }
-
-    private async Task ExecuteSearch()
-    {
-        if (string.IsNullOrWhiteSpace(_searchValue)) return;
-
-        _searching = true;
-        _searchError = null;
-        _searchResults = null;
-        _selectedEntry = null;
-        _selectedDn = null;
-        _showSearchHistory = false;
-        _showCreateEntry = false;
-        StateHasChanged();
-
-        try
-        {
-            string filter;
-            if (_searchAttribute == "")
-            {
-                filter = _searchValue.Trim();
-                if (!filter.StartsWith("("))
-                    filter = $"({filter})";
-            }
-            else
-            {
-                var val = _searchValue.Trim();
-                if (!val.Contains('*'))
-                    val = $"*{val}*";
-                filter = $"({_searchAttribute}={val})";
-            }
-
-            _searchResults = await ConnMgr.Active!.Search(ConnMgr.Settings!.BaseDn, filter);
-            await AddToSearchHistory(_searchAttribute, _searchValue.Trim());
-        }
-        catch (Exception ex)
-        {
-            _searchError = ex.Message;
-            _searchResults = null;
-        }
-        finally
-        {
-            _searching = false;
-        }
-    }
-
-    private void ClearSearch()
-    {
-        _searchResults = null;
-        _searchError = null;
-        _searchValue = "";
     }
 
     private async Task ExpandAll()
@@ -739,7 +557,7 @@ else
         }
         catch (Exception ex)
         {
-            _searchError = $"LDIF Export Fehler: {ex.Message}";
+            _searchError = string.Format(L["Browser_LdifExportError"], ex.Message);
         }
         finally
         {
@@ -766,9 +584,70 @@ else
         Navigation.NavigateTo("/");
     }
 
-    private class SearchHistoryItem
+    // Context Menu
+    private void ShowContextMenu(TreeContextMenuArgs args)
     {
-        public string Attribute { get; set; } = "";
-        public string Value { get; set; } = "";
+        _contextMenu = args;
+        StateHasChanged();
+    }
+
+    private void CloseContextMenu()
+    {
+        _contextMenu = null;
+    }
+
+    private void ContextMenuNewChild()
+    {
+        if (_contextMenu == null) return;
+        _showCreateEntry = true;
+        _copySource = null;
+        _searchResults = null;
+        _selectedDn = _contextMenu.Dn;
+        _contextMenu = null;
+    }
+
+    private async Task ContextMenuCopy()
+    {
+        if (_contextMenu == null) return;
+        var dn = _contextMenu.Dn;
+        _contextMenu = null;
+
+        try
+        {
+            var entry = await ConnMgr.Active!.GetEntry(dn);
+            if (entry != null)
+                HandleCopyEntry(entry);
+        }
+        catch { }
+    }
+
+    private async Task ContextMenuCopyDn()
+    {
+        if (_contextMenu == null) return;
+        await JS.InvokeVoidAsync("clipboardCopy", _contextMenu.Dn);
+        _contextMenu = null;
+    }
+
+    private async Task ContextMenuDelete()
+    {
+        if (_contextMenu == null) return;
+        var dn = _contextMenu.Dn;
+        _contextMenu = null;
+
+        try
+        {
+            await ConnMgr.Active!.DeleteEntry(dn);
+            _treeVersion++;
+            await LoadRootEntries();
+            if (_selectedDn == dn)
+            {
+                _selectedDn = null;
+                _selectedEntry = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _searchError = string.Format(L["Browser_DeleteError"], ex.Message);
+        }
     }
 }

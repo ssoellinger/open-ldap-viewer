@@ -1,0 +1,734 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Navigation -->
+  <data name="Nav_Connection" xml:space="preserve">
+    <value>Verbindung</value>
+  </data>
+  <data name="Nav_Browser" xml:space="preserve">
+    <value>Browser</value>
+  </data>
+  <data name="Nav_Compare" xml:space="preserve">
+    <value>Vergleich</value>
+  </data>
+  <data name="Nav_LdifImport" xml:space="preserve">
+    <value>LDIF Import</value>
+  </data>
+  <data name="Nav_Schema" xml:space="preserve">
+    <value>Schema</value>
+  </data>
+  <data name="Nav_Statistics" xml:space="preserve">
+    <value>Statistiken</value>
+  </data>
+  <data name="Nav_DarkModeToggle" xml:space="preserve">
+    <value>Dunkelmodus umschalten</value>
+  </data>
+
+  <!-- Home / Connection Page -->
+  <data name="PageTitle_Connection" xml:space="preserve">
+    <value>Open LDAP Viewer - Verbindung</value>
+  </data>
+  <data name="Home_SavedConnections" xml:space="preserve">
+    <value>Gespeicherte Verbindungen</value>
+  </data>
+  <data name="Home_Delete" xml:space="preserve">
+    <value>Loeschen</value>
+  </data>
+  <data name="Home_LdapConnection" xml:space="preserve">
+    <value>LDAP-Verbindung</value>
+  </data>
+  <data name="Home_Server" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="Home_Port" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="Home_BaseDn" xml:space="preserve">
+    <value>Base DN</value>
+  </data>
+  <data name="Home_Username" xml:space="preserve">
+    <value>Benutzername (optional)</value>
+  </data>
+  <data name="Home_Password" xml:space="preserve">
+    <value>Passwort (optional)</value>
+  </data>
+  <data name="Home_Connect" xml:space="preserve">
+    <value>Verbinden</value>
+  </data>
+  <data name="Home_Test" xml:space="preserve">
+    <value>Testen</value>
+  </data>
+  <data name="Home_Save" xml:space="preserve">
+    <value>Speichern</value>
+  </data>
+  <data name="Home_ConnectionSuccess" xml:space="preserve">
+    <value>Verbindung erfolgreich!</value>
+  </data>
+  <data name="Home_PasswordCheck" xml:space="preserve">
+    <value>Passwort pruefen</value>
+  </data>
+  <data name="Home_PasswordCheckDesc" xml:space="preserve">
+    <value>Pruefen Sie, ob ein LDAP-Bind mit einem bestimmten Benutzer und Passwort erfolgreich ist.</value>
+  </data>
+  <data name="Home_UserDn" xml:space="preserve">
+    <value>Benutzer-DN</value>
+  </data>
+  <data name="Home_PasswordLabel" xml:space="preserve">
+    <value>Passwort</value>
+  </data>
+  <data name="Home_Check" xml:space="preserve">
+    <value>Pruefen</value>
+  </data>
+  <data name="Home_BindSuccess" xml:space="preserve">
+    <value>Bind erfolgreich! Benutzer und Passwort sind korrekt.</value>
+  </data>
+  <data name="Home_ServerRequired" xml:space="preserve">
+    <value>Server muss ausgefuellt sein um zu speichern.</value>
+  </data>
+  <data name="Home_ConnectionFailed" xml:space="preserve">
+    <value>Verbindung fehlgeschlagen: {0}</value>
+  </data>
+  <data name="Home_UserDnPasswordRequired" xml:space="preserve">
+    <value>Benutzer-DN und Passwort muessen ausgefuellt sein.</value>
+  </data>
+  <data name="Home_BindFailed" xml:space="preserve">
+    <value>Bind fehlgeschlagen: {0}</value>
+  </data>
+
+  <!-- Browser Page -->
+  <data name="PageTitle_Browser" xml:space="preserve">
+    <value>Open LDAP Viewer - Browser</value>
+  </data>
+  <data name="Browser_Reconnecting" xml:space="preserve">
+    <value>Verbindung wird wiederhergestellt...</value>
+  </data>
+  <data name="Browser_NotConnected" xml:space="preserve">
+    <value>Nicht verbunden.</value>
+  </data>
+  <data name="Browser_ToConnectionPage" xml:space="preserve">
+    <value>Zur Verbindungsseite</value>
+  </data>
+  <data name="Browser_DirectoryTree" xml:space="preserve">
+    <value>Verzeichnisbaum</value>
+  </data>
+  <data name="Browser_Disconnect" xml:space="preserve">
+    <value>Trennen</value>
+  </data>
+  <data name="Browser_NewEntry" xml:space="preserve">
+    <value>+ Neu</value>
+  </data>
+  <data name="Browser_ExpandAll" xml:space="preserve">
+    <value>Aufklappen</value>
+  </data>
+  <data name="Browser_CollapseAll" xml:space="preserve">
+    <value>Zuklappen</value>
+  </data>
+  <data name="Browser_ExportTreeLdif" xml:space="preserve">
+    <value>Gesamten Baum als LDIF exportieren</value>
+  </data>
+  <data name="Browser_Bookmarks" xml:space="preserve">
+    <value>Lesezeichen</value>
+  </data>
+  <data name="Browser_Loading" xml:space="preserve">
+    <value>Lade...</value>
+  </data>
+  <data name="Browser_NoEntries" xml:space="preserve">
+    <value>Keine Eintraege gefunden.</value>
+  </data>
+  <data name="Browser_ResultCount" xml:space="preserve">
+    <value>{0} Ergebnis(se)</value>
+  </data>
+  <data name="Browser_Selected" xml:space="preserve">
+    <value>{0} ausgewaehlt</value>
+  </data>
+  <data name="Browser_DeleteSelected" xml:space="preserve">
+    <value>Ausgewaehlte loeschen</value>
+  </data>
+  <data name="Browser_BulkDelete" xml:space="preserve">
+    <value>Loeschen</value>
+  </data>
+  <data name="Browser_None" xml:space="preserve">
+    <value>Keine</value>
+  </data>
+  <data name="Browser_ClickResult" xml:space="preserve">
+    <value>Ergebnis anklicken fuer Details.</value>
+  </data>
+  <data name="Browser_SelectEntry" xml:space="preserve">
+    <value>Eintrag im Baum auswaehlen, um Details anzuzeigen.</value>
+  </data>
+  <data name="Browser_LdifExportError" xml:space="preserve">
+    <value>LDIF Export Fehler: {0}</value>
+  </data>
+  <data name="Browser_LoadError" xml:space="preserve">
+    <value>Fehler beim Laden: {0}</value>
+  </data>
+  <data name="Browser_LoadEntryError" xml:space="preserve">
+    <value>Fehler beim Laden des Eintrags: {0}</value>
+  </data>
+  <data name="Browser_DeleteError" xml:space="preserve">
+    <value>Fehler beim Loeschen: {0}</value>
+  </data>
+  <data name="Browser_BulkDeleteErrors" xml:space="preserve">
+    <value>{0} Fehler beim Loeschen: {1}</value>
+  </data>
+
+  <!-- Compare Page -->
+  <data name="PageTitle_Compare" xml:space="preserve">
+    <value>Open LDAP Viewer - Vergleich</value>
+  </data>
+  <data name="Compare_Title" xml:space="preserve">
+    <value>Eintraege vergleichen</value>
+  </data>
+  <data name="Compare_Button" xml:space="preserve">
+    <value>Vergleichen</value>
+  </data>
+  <data name="Compare_Attribute" xml:space="preserve">
+    <value>Attribut</value>
+  </data>
+  <data name="Compare_OnlyInOne" xml:space="preserve">
+    <value>Nur in einem Eintrag</value>
+  </data>
+  <data name="Compare_Different" xml:space="preserve">
+    <value>Unterschiedliche Werte</value>
+  </data>
+  <data name="Compare_Same" xml:space="preserve">
+    <value>Identisch</value>
+  </data>
+  <data name="Compare_BothRequired" xml:space="preserve">
+    <value>Beide DNs muessen ausgefuellt sein.</value>
+  </data>
+  <data name="Compare_NotFound" xml:space="preserve">
+    <value>Eintrag nicht gefunden: {0}</value>
+  </data>
+  <data name="Compare_Error" xml:space="preserve">
+    <value>Fehler: {0}</value>
+  </data>
+
+  <!-- LDIF Import Page -->
+  <data name="PageTitle_LdifImport" xml:space="preserve">
+    <value>Open LDAP Viewer - LDIF Import</value>
+  </data>
+  <data name="Ldif_Title" xml:space="preserve">
+    <value>LDIF Import</value>
+  </data>
+  <data name="Ldif_Content" xml:space="preserve">
+    <value>LDIF-Inhalt</value>
+  </data>
+  <data name="Ldif_Upload" xml:space="preserve">
+    <value>Oder Datei hochladen</value>
+  </data>
+  <data name="Ldif_Parse" xml:space="preserve">
+    <value>Parsen</value>
+  </data>
+  <data name="Ldif_Execute" xml:space="preserve">
+    <value>Ausfuehren ({0} Operationen)</value>
+  </data>
+  <data name="Ldif_Reset" xml:space="preserve">
+    <value>Zuruecksetzen</value>
+  </data>
+  <data name="Ldif_Preview" xml:space="preserve">
+    <value>Vorschau</value>
+  </data>
+  <data name="Ldif_DN" xml:space="preserve">
+    <value>DN</value>
+  </data>
+  <data name="Ldif_Operation" xml:space="preserve">
+    <value>Operation</value>
+  </data>
+  <data name="Ldif_Attributes" xml:space="preserve">
+    <value>Attribute</value>
+  </data>
+  <data name="Ldif_Results" xml:space="preserve">
+    <value>Ergebnisse</value>
+  </data>
+  <data name="Ldif_Status" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="Ldif_Error" xml:space="preserve">
+    <value>Fehler</value>
+  </data>
+  <data name="Ldif_Success" xml:space="preserve">
+    <value>Erfolg</value>
+  </data>
+  <data name="Ldif_SuccessCount" xml:space="preserve">
+    <value>{0} von {1} erfolgreich</value>
+  </data>
+  <data name="Ldif_NoValidOps" xml:space="preserve">
+    <value>Keine gueltige LDIF-Operationen gefunden.</value>
+  </data>
+  <data name="Ldif_ParseError" xml:space="preserve">
+    <value>Parse-Fehler: {0}</value>
+  </data>
+  <data name="Ldif_FileError" xml:space="preserve">
+    <value>Datei-Fehler: {0}</value>
+  </data>
+  <data name="Ldif_GeneralError" xml:space="preserve">
+    <value>Fehler: {0}</value>
+  </data>
+
+  <!-- Schema Page -->
+  <data name="PageTitle_Schema" xml:space="preserve">
+    <value>Open LDAP Viewer - Schema</value>
+  </data>
+  <data name="Schema_Loading" xml:space="preserve">
+    <value>Schema wird geladen...</value>
+  </data>
+  <data name="Schema_Search" xml:space="preserve">
+    <value>Schema durchsuchen...</value>
+  </data>
+  <data name="Schema_Definition" xml:space="preserve">
+    <value>Definition: {0}</value>
+  </data>
+  <data name="Schema_Error" xml:space="preserve">
+    <value>Fehler: {0}</value>
+  </data>
+
+  <!-- Statistics Page -->
+  <data name="PageTitle_Statistics" xml:space="preserve">
+    <value>Open LDAP Viewer - Statistiken</value>
+  </data>
+  <data name="Stats_Title" xml:space="preserve">
+    <value>Verzeichnis-Statistiken</value>
+  </data>
+  <data name="Stats_Load" xml:space="preserve">
+    <value>Statistiken laden</value>
+  </data>
+  <data name="Stats_Refresh" xml:space="preserve">
+    <value>Aktualisieren</value>
+  </data>
+  <data name="Stats_TotalEntries" xml:space="preserve">
+    <value>Eintraege gesamt</value>
+  </data>
+  <data name="Stats_OrgUnits" xml:space="preserve">
+    <value>Organisationseinheiten</value>
+  </data>
+  <data name="Stats_ByObjectClass" xml:space="preserve">
+    <value>Nach ObjectClass</value>
+  </data>
+  <data name="Stats_Count" xml:space="preserve">
+    <value>Anzahl</value>
+  </data>
+  <data name="Stats_Distribution" xml:space="preserve">
+    <value>Verteilung</value>
+  </data>
+  <data name="Stats_ByOu" xml:space="preserve">
+    <value>Nach Organisationseinheit (OU)</value>
+  </data>
+  <data name="Stats_NoOus" xml:space="preserve">
+    <value>Keine OUs gefunden.</value>
+  </data>
+  <data name="Stats_ClickLoad" xml:space="preserve">
+    <value>Klicken Sie auf "Statistiken laden" um die Verzeichnis-Statistiken zu berechnen.</value>
+  </data>
+  <data name="Stats_LoadError" xml:space="preserve">
+    <value>Fehler beim Laden der Statistiken: {0}</value>
+  </data>
+
+  <!-- Entry Detail -->
+  <data name="Detail_Edit" xml:space="preserve">
+    <value>Bearbeiten</value>
+  </data>
+  <data name="Detail_Password" xml:space="preserve">
+    <value>Passwort</value>
+  </data>
+  <data name="Detail_Members" xml:space="preserve">
+    <value>Mitglieder</value>
+  </data>
+  <data name="Detail_Move" xml:space="preserve">
+    <value>Verschieben</value>
+  </data>
+  <data name="Detail_CopyDn" xml:space="preserve">
+    <value>DN kopieren</value>
+  </data>
+  <data name="Detail_Copied" xml:space="preserve">
+    <value>Kopiert!</value>
+  </data>
+  <data name="Detail_Copy" xml:space="preserve">
+    <value>Kopieren</value>
+  </data>
+  <data name="Detail_BookmarkRemove" xml:space="preserve">
+    <value>Lesezeichen entfernen</value>
+  </data>
+  <data name="Detail_BookmarkSet" xml:space="preserve">
+    <value>Lesezeichen setzen</value>
+  </data>
+  <data name="Detail_ConfirmDelete" xml:space="preserve">
+    <value>Wirklich loeschen?</value>
+  </data>
+  <data name="Detail_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="Detail_Delete" xml:space="preserve">
+    <value>Loeschen</value>
+  </data>
+  <data name="Detail_Save" xml:space="preserve">
+    <value>Speichern</value>
+  </data>
+  <data name="Detail_NoAttributes" xml:space="preserve">
+    <value>Keine Attribute vorhanden.</value>
+  </data>
+  <data name="Detail_Attribute" xml:space="preserve">
+    <value>Attribut</value>
+  </data>
+  <data name="Detail_Values" xml:space="preserve">
+    <value>Wert(e)</value>
+  </data>
+  <data name="Detail_RemoveValue" xml:space="preserve">
+    <value>Wert entfernen</value>
+  </data>
+  <data name="Detail_AddValue" xml:space="preserve">
+    <value>+ Wert</value>
+  </data>
+  <data name="Detail_NewAttribute" xml:space="preserve">
+    <value>Neues Attribut</value>
+  </data>
+  <data name="Detail_Value" xml:space="preserve">
+    <value>Wert</value>
+  </data>
+  <data name="Detail_Add" xml:space="preserve">
+    <value>Hinzufuegen</value>
+  </data>
+  <data name="Detail_ClickToCopy" xml:space="preserve">
+    <value>Klicken zum Kopieren</value>
+  </data>
+  <data name="Detail_NavigateToEntry" xml:space="preserve">
+    <value>Zum Eintrag navigieren</value>
+  </data>
+  <data name="Detail_ChangePasswordTitle" xml:space="preserve">
+    <value>Passwort aendern</value>
+  </data>
+  <data name="Detail_ManageMembersTitle" xml:space="preserve">
+    <value>Mitglieder verwalten</value>
+  </data>
+  <data name="Detail_MoveRenameTitle" xml:space="preserve">
+    <value>Verschieben/Umbenennen</value>
+  </data>
+  <data name="Detail_CopyAsTemplate" xml:space="preserve">
+    <value>Eintrag als Vorlage kopieren</value>
+  </data>
+  <data name="Detail_DeleteEntry" xml:space="preserve">
+    <value>Eintrag loeschen</value>
+  </data>
+  <data name="Detail_ChangesSaved" xml:space="preserve">
+    <value>Aenderungen gespeichert.</value>
+  </data>
+  <data name="Detail_SaveError" xml:space="preserve">
+    <value>Fehler beim Speichern: {0}</value>
+  </data>
+  <data name="Detail_DeleteError" xml:space="preserve">
+    <value>Fehler beim Loeschen: {0}</value>
+  </data>
+  <data name="Detail_ExportLdif" xml:space="preserve">
+    <value>Als LDIF exportieren</value>
+  </data>
+
+  <!-- Entry Editor -->
+  <data name="Editor_NewEntry" xml:space="preserve">
+    <value>Neuer Eintrag</value>
+  </data>
+  <data name="Editor_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="Editor_Template" xml:space="preserve">
+    <value>Vorlage</value>
+  </data>
+  <data name="Editor_Person" xml:space="preserve">
+    <value>Person</value>
+  </data>
+  <data name="Editor_Group" xml:space="preserve">
+    <value>Gruppe</value>
+  </data>
+  <data name="Editor_OrgUnit" xml:space="preserve">
+    <value>Org.-Einheit</value>
+  </data>
+  <data name="Editor_PosixUser" xml:space="preserve">
+    <value>POSIX-User</value>
+  </data>
+  <data name="Editor_PosixGroup" xml:space="preserve">
+    <value>POSIX-Gruppe</value>
+  </data>
+  <data name="Editor_Empty" xml:space="preserve">
+    <value>Leer</value>
+  </data>
+  <data name="Editor_Rdn" xml:space="preserve">
+    <value>RDN</value>
+  </data>
+  <data name="Editor_RdnExample" xml:space="preserve">
+    <value>(z.B. {0})</value>
+  </data>
+  <data name="Editor_ParentDn" xml:space="preserve">
+    <value>Parent DN</value>
+  </data>
+  <data name="Editor_FullDn" xml:space="preserve">
+    <value>Vollstaendiger DN:</value>
+  </data>
+  <data name="Editor_Required" xml:space="preserve">
+    <value>Pflichtattribute</value>
+  </data>
+  <data name="Editor_RequiredAttr" xml:space="preserve">
+    <value>Pflichtattribut</value>
+  </data>
+  <data name="Editor_Additional" xml:space="preserve">
+    <value>Weitere Attribute</value>
+  </data>
+  <data name="Editor_AddAttribute" xml:space="preserve">
+    <value>+ Attribut</value>
+  </data>
+  <data name="Editor_Create" xml:space="preserve">
+    <value>Erstellen</value>
+  </data>
+  <data name="Editor_RdnEmpty" xml:space="preserve">
+    <value>RDN ist leer.</value>
+  </data>
+  <data name="Editor_ObjectClassRequired" xml:space="preserve">
+    <value>Mindestens eine objectClass ist erforderlich.</value>
+  </data>
+  <data name="Editor_RequiredNoValue" xml:space="preserve">
+    <value>Pflichtattribut '{0}' hat keinen Wert.</value>
+  </data>
+  <data name="Editor_RdnRequired" xml:space="preserve">
+    <value>RDN muss ausgefuellt sein.</value>
+  </data>
+  <data name="Editor_Created" xml:space="preserve">
+    <value>Eintrag '{0}' erstellt.</value>
+  </data>
+  <data name="Editor_CreateError" xml:space="preserve">
+    <value>Fehler beim Erstellen: {0}</value>
+  </data>
+  <data name="Editor_EmptyPreview" xml:space="preserve">
+    <value>(leer)</value>
+  </data>
+
+  <!-- Search Panel -->
+  <data name="Search_LdapFilter" xml:space="preserve">
+    <value>LDAP-Filter</value>
+  </data>
+  <data name="Search_SnSurname" xml:space="preserve">
+    <value>SN (Nachname)</value>
+  </data>
+  <data name="Search_GivenName" xml:space="preserve">
+    <value>Vorname</value>
+  </data>
+  <data name="Search_Phone" xml:space="preserve">
+    <value>Telefon</value>
+  </data>
+  <data name="Search_DisplayName" xml:space="preserve">
+    <value>Anzeigename</value>
+  </data>
+  <data name="Search_FilterPlaceholder" xml:space="preserve">
+    <value>z.B. (cn=*Mueller*)</value>
+  </data>
+  <data name="Search_TermPlaceholder" xml:space="preserve">
+    <value>Suchbegriff (* als Platzhalter)</value>
+  </data>
+  <data name="Search_Search" xml:space="preserve">
+    <value>Suchen</value>
+  </data>
+  <data name="Search_SaveSearch" xml:space="preserve">
+    <value>Suche speichern</value>
+  </data>
+  <data name="Search_SearchName" xml:space="preserve">
+    <value>Name fuer Suche</value>
+  </data>
+  <data name="Search_Save" xml:space="preserve">
+    <value>Speichern</value>
+  </data>
+
+  <!-- Context Menu -->
+  <data name="Context_NewChild" xml:space="preserve">
+    <value>+ Neues Kind</value>
+  </data>
+  <data name="Context_Copy" xml:space="preserve">
+    <value>Kopieren</value>
+  </data>
+  <data name="Context_CopyDn" xml:space="preserve">
+    <value>DN kopieren</value>
+  </data>
+  <data name="Context_Delete" xml:space="preserve">
+    <value>Loeschen</value>
+  </data>
+
+  <!-- Connection Tabs -->
+  <data name="Tabs_CloseConnection" xml:space="preserve">
+    <value>Verbindung schliessen</value>
+  </data>
+  <data name="Tabs_NewConnection" xml:space="preserve">
+    <value>Neue Verbindung</value>
+  </data>
+
+  <!-- Move/Rename Tool -->
+  <data name="Move_Title" xml:space="preserve">
+    <value>Verschieben / Umbenennen</value>
+  </data>
+  <data name="Move_NewRdn" xml:space="preserve">
+    <value>Neuer RDN</value>
+  </data>
+  <data name="Move_NewParent" xml:space="preserve">
+    <value>Neuer Parent DN (leer = gleicher Ort)</value>
+  </data>
+  <data name="Move_Button" xml:space="preserve">
+    <value>Verschieben</value>
+  </data>
+  <data name="Move_NoChange" xml:space="preserve">
+    <value>Keine Aenderung angegeben.</value>
+  </data>
+  <data name="Move_Error" xml:space="preserve">
+    <value>Fehler: {0}</value>
+  </data>
+
+  <!-- Binary Preview -->
+  <data name="Binary_Hide" xml:space="preserve">
+    <value>Ausblenden</value>
+  </data>
+  <data name="Binary_ShowImage" xml:space="preserve">
+    <value>Bild anzeigen</value>
+  </data>
+  <data name="Binary_ShowCert" xml:space="preserve">
+    <value>Zertifikat anzeigen</value>
+  </data>
+  <data name="Binary_Issuer" xml:space="preserve">
+    <value>Aussteller:</value>
+  </data>
+  <data name="Binary_ValidFrom" xml:space="preserve">
+    <value>Gueltig von:</value>
+  </data>
+  <data name="Binary_ValidTo" xml:space="preserve">
+    <value>Gueltig bis:</value>
+  </data>
+  <data name="Binary_SerialNo" xml:space="preserve">
+    <value>Seriennr.:</value>
+  </data>
+  <data name="Binary_CertDecodeError" xml:space="preserve">
+    <value>Zertifikat konnte nicht dekodiert werden</value>
+  </data>
+
+  <!-- Group Member Manager -->
+  <data name="Group_ManageMembers" xml:space="preserve">
+    <value>Mitglieder verwalten ({0})</value>
+  </data>
+  <data name="Group_SearchUsers" xml:space="preserve">
+    <value>Benutzer suchen (Name, DN, uid...)</value>
+  </data>
+  <data name="Group_Search" xml:space="preserve">
+    <value>Suchen</value>
+  </data>
+  <data name="Group_Member" xml:space="preserve">
+    <value>Mitglied</value>
+  </data>
+  <data name="Group_NoMembers" xml:space="preserve">
+    <value>Keine Mitglieder.</value>
+  </data>
+  <data name="Group_Remove" xml:space="preserve">
+    <value>Entfernen</value>
+  </data>
+  <data name="Group_EnterDn" xml:space="preserve">
+    <value>DN direkt eingeben</value>
+  </data>
+  <data name="Group_Add" xml:space="preserve">
+    <value>Hinzufuegen</value>
+  </data>
+  <data name="Group_MemberAdded" xml:space="preserve">
+    <value>Mitglied hinzugefuegt.</value>
+  </data>
+  <data name="Group_MemberRemoved" xml:space="preserve">
+    <value>Mitglied entfernt.</value>
+  </data>
+  <data name="Group_Error" xml:space="preserve">
+    <value>Fehler: {0}</value>
+  </data>
+
+  <!-- Password Tool -->
+  <data name="Pwd_Title" xml:space="preserve">
+    <value>Passwort aendern</value>
+  </data>
+  <data name="Pwd_NewPassword" xml:space="preserve">
+    <value>Neues Passwort</value>
+  </data>
+  <data name="Pwd_Placeholder" xml:space="preserve">
+    <value>Passwort eingeben</value>
+  </data>
+  <data name="Pwd_Hide" xml:space="preserve">
+    <value>Verbergen</value>
+  </data>
+  <data name="Pwd_Show" xml:space="preserve">
+    <value>Zeigen</value>
+  </data>
+  <data name="Pwd_Generate" xml:space="preserve">
+    <value>Generieren</value>
+  </data>
+  <data name="Pwd_GenerateTitle" xml:space="preserve">
+    <value>Zufaelliges Passwort generieren</value>
+  </data>
+  <data name="Pwd_HashAlgorithm" xml:space="preserve">
+    <value>Hash-Algorithmus</value>
+  </data>
+  <data name="Pwd_Recommended" xml:space="preserve">
+    <value>empfohlen</value>
+  </data>
+  <data name="Pwd_Cleartext" xml:space="preserve">
+    <value>Klartext</value>
+  </data>
+  <data name="Pwd_Preview" xml:space="preserve">
+    <value>Vorschau</value>
+  </data>
+  <data name="Pwd_Set" xml:space="preserve">
+    <value>Passwort setzen</value>
+  </data>
+  <data name="Pwd_SetSuccess" xml:space="preserve">
+    <value>Passwort gesetzt.</value>
+  </data>
+  <data name="Pwd_Error" xml:space="preserve">
+    <value>Fehler: {0}</value>
+  </data>
+
+  <!-- Tree -->
+  <data name="Tree_Loading" xml:space="preserve">
+    <value>Lade...</value>
+  </data>
+
+  <!-- Autocomplete -->
+  <data name="Autocomplete_Placeholder" xml:space="preserve">
+    <value>Attribut-Name</value>
+  </data>
+
+</root>

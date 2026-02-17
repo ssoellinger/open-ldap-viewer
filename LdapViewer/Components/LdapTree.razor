@@ -1,8 +1,8 @@
-@using LdapViewer.Models
-@using LdapViewer.Services
+@inject IStringLocalizer<Loc> L
 
 <div class="tree-node">
-    <div class="tree-node-row @(_isSelected ? "selected" : "")" @onclick="HandleRowClick">
+    <div class="tree-node-row @(_isSelected ? "selected" : "")" @onclick="HandleRowClick"
+         @oncontextmenu="HandleContextMenu" @oncontextmenu:preventDefault="true">
         @if (_isLeaf)
         {
             <span class="tree-toggle-placeholder"></span>
@@ -32,7 +32,8 @@
                           Entry="child"
                           LdapService="LdapService"
                           SelectedDn="@SelectedDn"
-                          OnSelect="OnSelect" />
+                          OnSelect="OnSelect"
+                          OnContextMenu="OnContextMenu" />
             }
         </div>
     }
@@ -40,7 +41,7 @@
     {
         <div class="tree-children">
             <div class="tree-loading">
-                <span class="spinner-border spinner-border-sm"></span> Lade...
+                <span class="spinner-border spinner-border-sm"></span> @L["Tree_Loading"]
             </div>
         </div>
     }
@@ -64,6 +65,9 @@
 
     [Parameter]
     public EventCallback<string> OnSelect { get; set; }
+
+    [Parameter]
+    public EventCallback<TreeContextMenuArgs> OnContextMenu { get; set; }
 
     [Parameter]
     public bool AutoExpand { get; set; }
@@ -118,6 +122,22 @@
         }
     }
 
+    private async Task HandleContextMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)
+    {
+        await OnSelect.InvokeAsync(Entry.Dn);
+        if (OnContextMenu.HasDelegate)
+        {
+            await OnContextMenu.InvokeAsync(new TreeContextMenuArgs
+            {
+                Dn = Entry.Dn,
+                DisplayName = Entry.DisplayName,
+                ClientX = e.ClientX,
+                ClientY = e.ClientY,
+                IsLeaf = _isLeaf
+            });
+        }
+    }
+
     public async Task ExpandAll()
     {
         await Expand();
@@ -125,7 +145,7 @@
         if (_children == null) return;
 
         StateHasChanged();
-        await Task.Delay(1); // let child refs register
+        await Task.Delay(1);
 
         foreach (var childRef in _childRefs.Values)
         {
@@ -182,4 +202,5 @@
             }
         }
     }
+
 }

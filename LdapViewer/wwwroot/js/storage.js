@@ -1,50 +1,27 @@
+// Factory for simple load/save localStorage objects
+function createStorage(key, defaultValue) {
+    return {
+        load: function () { return localStorage.getItem(key) || defaultValue; },
+        save: function (json) { localStorage.setItem(key, json); }
+    };
+}
+
+// Connection storage has extra methods for last-connection
 window.connectionStorage = {
-    load: function () {
-        return localStorage.getItem("ldap-connections") || "[]";
-    },
-    save: function (json) {
-        localStorage.setItem("ldap-connections", json);
-    },
-    loadLastConnection: function () {
-        return localStorage.getItem("ldap-last-connection") || "";
-    },
-    saveLastConnection: function (json) {
-        localStorage.setItem("ldap-last-connection", json);
-    },
-    clearLastConnection: function () {
-        localStorage.removeItem("ldap-last-connection");
-    }
+    load: function () { return localStorage.getItem("ldap-connections") || "[]"; },
+    save: function (json) { localStorage.setItem("ldap-connections", json); },
+    loadLastConnection: function () { return localStorage.getItem("ldap-last-connection") || ""; },
+    saveLastConnection: function (json) { localStorage.setItem("ldap-last-connection", json); },
+    clearLastConnection: function () { localStorage.removeItem("ldap-last-connection"); }
 };
 
-window.bookmarkStorage = {
-    load: function () {
-        return localStorage.getItem("ldap-bookmarks") || "[]";
-    },
-    save: function (json) {
-        localStorage.setItem("ldap-bookmarks", json);
-    }
-};
+window.bookmarkStorage = createStorage("ldap-bookmarks", "[]");
+window.searchHistoryStorage = createStorage("ldap-search-history", "[]");
+window.savedSearchStorage = createStorage("ldap-saved-searches", "[]");
+window.darkModeStorage = createStorage("ldap-dark-mode", "false");
 
 window.clipboardCopy = function (text) {
     return navigator.clipboard.writeText(text);
-};
-
-window.searchHistoryStorage = {
-    load: function () {
-        return localStorage.getItem("ldap-search-history") || "[]";
-    },
-    save: function (json) {
-        localStorage.setItem("ldap-search-history", json);
-    }
-};
-
-window.darkModeStorage = {
-    load: function () {
-        return localStorage.getItem("ldap-dark-mode") || "false";
-    },
-    save: function (enabled) {
-        localStorage.setItem("ldap-dark-mode", enabled);
-    }
 };
 
 window.setDarkMode = function (enabled) {
@@ -71,13 +48,16 @@ window.toggleDarkMode = function () {
     }
     applyDarkMode();
 
-    // Re-apply after Blazor enhanced navigation (DOM gets patched)
     document.addEventListener("DOMContentLoaded", function () {
         if (window.Blazor) {
             Blazor.addEventListener("enhancedload", applyDarkMode);
         }
     });
 })();
+
+window.setLanguageCookie = function (culture) {
+    document.cookie = ".AspNetCore.Culture=c=" + culture + "|uic=" + culture + ";path=/;max-age=31536000;samesite=lax";
+};
 
 window.downloadFile = function (filename, content) {
     var blob = new Blob([content], { type: "text/plain;charset=utf-8" });

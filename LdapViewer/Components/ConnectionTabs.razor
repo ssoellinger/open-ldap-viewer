@@ -1,0 +1,30 @@
+@inject IStringLocalizer<Loc> L
+
+@if (Connections.Count > 1)
+{
+    <div class="connection-tabs">
+        @foreach (var conn in Connections)
+        {
+            var connId = conn.Id;
+            <div class="connection-tab @(conn.IsActive ? "active" : "")" @onclick="() => OnSwitch.InvokeAsync(connId)">
+                <span class="connection-tab-label">@conn.Name</span>
+                <button class="connection-tab-close" @onclick:stopPropagation="true" @onclick="() => OnClose.InvokeAsync(connId)" title="@L["Tabs_CloseConnection"]"><i class="bi bi-x"></i></button>
+            </div>
+        }
+        <div class="connection-tab connection-tab-add" @onclick="OnAddNew" title="@L["Tabs_NewConnection"]"><i class="bi bi-plus"></i></div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public List<ConnectionInfo> Connections { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<string> OnSwitch { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback OnAddNew { get; set; }
+}

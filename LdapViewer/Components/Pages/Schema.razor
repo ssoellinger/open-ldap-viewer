@@ -1,31 +1,35 @@
 @page "/schema"
-@using LdapViewer.Models
-@using LdapViewer.Services
 @inject ConnectionManager ConnMgr
-@inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject IStringLocalizer<Loc> L
 @rendermode InteractiveServer
 
-<PageTitle>Open LDAP Viewer - Schema</PageTitle>
+<PageTitle>@L["PageTitle_Schema"]</PageTitle>
 
-@if (!ConnMgr.IsConnected)
+@if (_reconnecting)
+{
+    <div class="container mt-4 text-center">
+        <span class="spinner-border me-2"></span> @L["Browser_Reconnecting"]
+    </div>
+}
+else if (!ConnMgr.IsConnected)
 {
     <div class="container mt-4">
         <div class="alert alert-warning">
-            Nicht verbunden. <a href="/">Zur Verbindungsseite</a>
+            @L["Browser_NotConnected"] <a href="/">@L["Browser_ToConnectionPage"]</a>
         </div>
     </div>
 }
 else if (_loading)
 {
     <div class="container mt-4 text-center">
-        <span class="spinner-border me-2"></span> Schema wird geladen...
+        <span class="spinner-border me-2"></span> @L["Schema_Loading"]
     </div>
 }
 else if (_error != null)
 {
     <div class="container mt-4">
-        <div class="alert alert-danger">Fehler: @_error</div>
+        <div class="alert alert-danger">@string.Format(L["Schema_Error"], _error)</div>
     </div>
 }
 else if (_schema != null)
@@ -33,11 +37,11 @@ else if (_schema != null)
     <div class="container-fluid mt-3">
         <div class="d-flex gap-2 mb-3">
             <div class="input-group input-group-sm" style="max-width: 400px">
-                <input type="text" class="form-control" placeholder="Schema durchsuchen..."
+                <input type="text" class="form-control" placeholder="@L["Schema_Search"]"
                        @bind="_filter" @bind:event="oninput" />
                 @if (!string.IsNullOrEmpty(_filter))
                 {
-                    <button class="btn btn-outline-secondary" @onclick="() => _filter = string.Empty">X</button>
+                    <button class="btn btn-outline-secondary" @onclick="() => _filter = string.Empty"><i class="bi bi-x"></i></button>
                 }
             </div>
         </div>
@@ -97,7 +101,7 @@ else if (_schema != null)
         @if (_selectedItem != null)
         {
             <div class="schema-definition mt-3">
-                <h6>Definition: @_selectedItem.Name</h6>
+                <h6>@string.Format(L["Schema_Definition"], _selectedItem.Name)</h6>
                 <pre class="bg-light p-3 border rounded" style="white-space: pre-wrap; word-break: break-all; font-size: 0.85rem;">@_selectedItem.Definition</pre>
             </div>
         }
@@ -131,10 +135,32 @@ else if (_schema != null)
                 (i.Description?.Contains(_filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
                 (i.Oid?.Contains(_filter, StringComparison.OrdinalIgnoreCase) ?? false));
 
+    private bool _reconnecting;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !ConnMgr.IsConnected)
+        {
+            _reconnecting = true;
+            StateHasChanged();
+            await ConnMgr.TryReconnectFromStorage(JS);
+            _reconnecting = false;
+
+            if (ConnMgr.IsConnected)
+                await LoadSchema();
+
+            StateHasChanged();
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
-        if (!ConnMgr.IsConnected) return;
+        if (ConnMgr.IsConnected)
+            await LoadSchema();
+    }
 
+    private async Task LoadSchema()
+    {
         _loading = true;
         try
         {

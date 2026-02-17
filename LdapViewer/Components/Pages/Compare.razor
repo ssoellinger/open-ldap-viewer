@@ -1,26 +1,29 @@
 @page "/compare"
-@using System.Text.Json
-@using LdapViewer.Models
-@using LdapViewer.Services
 @inject ConnectionManager ConnMgr
-@inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject IStringLocalizer<Loc> L
 @rendermode InteractiveServer
 
-<PageTitle>Open LDAP Viewer - Vergleich</PageTitle>
+<PageTitle>@L["PageTitle_Compare"]</PageTitle>
 
-@if (!ConnMgr.IsConnected)
+@if (_reconnecting)
+{
+    <div class="container mt-4 text-center">
+        <span class="spinner-border me-2"></span> @L["Browser_Reconnecting"]
+    </div>
+}
+else if (!ConnMgr.IsConnected)
 {
     <div class="container mt-4">
         <div class="alert alert-warning">
-            Nicht verbunden. <a href="/">Zur Verbindungsseite</a>
+            @L["Browser_NotConnected"] <a href="/">@L["Browser_ToConnectionPage"]</a>
         </div>
     </div>
 }
 else
 {
     <div class="container-fluid mt-3 px-4">
-        <h4 class="mb-3">Eintraege vergleichen</h4>
+        <h4 class="mb-3">@L["Compare_Title"]</h4>
 
         <div class="row mb-3">
             <div class="col-md-5">
@@ -37,7 +40,7 @@ else
                     {
                         <span class="spinner-border spinner-border-sm me-1"></span>
                     }
-                    Vergleichen
+                    <i class="bi bi-layout-split me-1"></i>@L["Compare_Button"]
                 </button>
             </div>
         </div>
@@ -52,7 +55,7 @@ else
             <table class="table table-sm compare-table">
                 <thead>
                     <tr>
-                        <th style="width: 20%">Attribut</th>
+                        <th style="width: 20%">@L["Compare_Attribute"]</th>
                         <th style="width: 40%">@_entry1.Dn</th>
                         <th style="width: 40%">@_entry2.Dn</th>
                     </tr>
@@ -86,9 +89,9 @@ else
             </table>
 
             <div class="d-flex gap-3 small text-muted mb-3">
-                <span><span class="compare-legend compare-legend-only"></span> Nur in einem Eintrag</span>
-                <span><span class="compare-legend compare-legend-diff"></span> Unterschiedliche Werte</span>
-                <span><span class="compare-legend compare-legend-same"></span> Identisch</span>
+                <span><span class="compare-legend compare-legend-only"></span> @L["Compare_OnlyInOne"]</span>
+                <span><span class="compare-legend compare-legend-diff"></span> @L["Compare_Different"]</span>
+                <span><span class="compare-legend compare-legend-same"></span> @L["Compare_Same"]</span>
             </div>
         }
     </div>
@@ -101,13 +104,26 @@ else
     private LdapEntry? _entry2;
     private List<string> _allAttributes = new();
     private bool _loading;
+    private bool _reconnecting;
     private string? _error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !ConnMgr.IsConnected)
+        {
+            _reconnecting = true;
+            StateHasChanged();
+            await ConnMgr.TryReconnectFromStorage(JS);
+            _reconnecting = false;
+            StateHasChanged();
+        }
+    }
 
     private async Task DoCompare()
     {
         if (string.IsNullOrWhiteSpace(_dn1) || string.IsNullOrWhiteSpace(_dn2))
         {
-            _error = "Beide DNs muessen ausgefuellt sein.";
+            _error = L["Compare_BothRequired"];
             return;
         }
 
@@ -124,12 +140,12 @@ else
 
             if (_entry1 == null)
             {
-                _error = $"Eintrag nicht gefunden: {_dn1}";
+                _error = string.Format(L["Compare_NotFound"], _dn1);
                 return;
             }
             if (_entry2 == null)
             {
-                _error = $"Eintrag nicht gefunden: {_dn2}";
+                _error = string.Format(L["Compare_NotFound"], _dn2);
                 return;
             }
 
@@ -140,7 +156,7 @@ else
         }
         catch (Exception ex)
         {
-            _error = $"Fehler: {ex.Message}";
+            _error = string.Format(L["Compare_Error"], ex.Message);
         }
         finally
         {

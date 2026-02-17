@@ -1,0 +1,115 @@
+@inject IStringLocalizer<Loc> L
+
+@if (IsImage)
+{
+    <button class="btn btn-sm btn-outline-info py-0 px-1 ms-1" @onclick="Toggle" style="font-size: 0.7rem;">
+        <i class="bi @(_expanded ? "bi-eye-slash" : "bi-image") me-1"></i>@(_expanded ? L["Binary_Hide"] : L["Binary_ShowImage"])
+    </button>
+}
+else if (IsCert)
+{
+    <button class="btn btn-sm btn-outline-info py-0 px-1 ms-1" @onclick="Toggle" style="font-size: 0.7rem;">
+        <i class="bi @(_expanded ? "bi-eye-slash" : "bi-shield-lock") me-1"></i>@(_expanded ? L["Binary_Hide"] : L["Binary_ShowCert"])
+    </button>
+}
+
+@if (_expanded && _data != null)
+{
+    <div class="binary-preview mt-1">
+        @if (IsImage)
+        {
+            <img src="data:image/@(DetectImageMime(_data));base64,@(Convert.ToBase64String(_data))" class="binary-preview-img" alt="@AttributeName" />
+        }
+        else if (_certInfo != null)
+        {
+            <div class="cert-info small">
+                <div><strong>Subject:</strong> @_certInfo.Subject</div>
+                <div><strong>@L["Binary_Issuer"]</strong> @_certInfo.Issuer</div>
+                <div><strong>@L["Binary_ValidFrom"]</strong> @_certInfo.NotBefore</div>
+                <div><strong>@L["Binary_ValidTo"]</strong> @_certInfo.NotAfter</div>
+                <div><strong>@L["Binary_SerialNo"]</strong> @_certInfo.SerialNumber</div>
+            </div>
+        }
+    </div>
+}
+else if (_expanded && _loading)
+{
+    <span class="spinner-border spinner-border-sm ms-1"></span>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public string Dn { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string AttributeName { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public LdapService LdapService { get; set; } = default!;
+
+    [Parameter]
+    public bool IsImage { get; set; }
+
+    [Parameter]
+    public bool IsCert { get; set; }
+
+    private bool _expanded;
+    private byte[]? _data;
+    private bool _loading;
+    private CertInfo? _certInfo;
+
+    private async Task Toggle()
+    {
+        if (_expanded) { _expanded = false; return; }
+
+        _expanded = true;
+        if (_data != null) return;
+
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            _data = await LdapService.GetBinaryAttribute(Dn, AttributeName);
+
+            if (_data != null && IsCert)
+            {
+                try
+                {
+                    using var cert = new System.Security.Cryptography.X509Certificates.X509Certificate2(_data);
+                    _certInfo = new CertInfo
+                    {
+                        Subject = cert.Subject,
+                        Issuer = cert.Issuer,
+                        NotBefore = cert.NotBefore.ToString("yyyy-MM-dd"),
+                        NotAfter = cert.NotAfter.ToString("yyyy-MM-dd"),
+                        SerialNumber = cert.SerialNumber
+                    };
+                }
+                catch
+                {
+                    _certInfo = new CertInfo { Subject = L["Binary_CertDecodeError"] };
+                }
+            }
+        }
+        catch
+        {
+            _data = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string DetectImageMime(byte[] data)
+    {
+        if (data.Length >= 8 && data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47)
+            return "png";
+        if (data.Length >= 4 && data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46)
+            return "gif";
+        if (data.Length >= 2 && data[0] == 0x42 && data[1] == 0x4D)
+            return "bmp";
+        return "jpeg";
+    }
+}

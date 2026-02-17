@@ -1,72 +1,59 @@
-@using LdapViewer.Models
-@using LdapViewer.Services
 @inject IJSRuntime JS
+@inject IStringLocalizer<Loc> L
 
 <div class="entry-detail">
     <div class="d-flex align-items-start justify-content-between mb-2">
-        <div class="dn-breadcrumb mb-0">
-            @{ var segments = ParseDnSegments(Entry.Dn); }
-            @for (int i = 0; i < segments.Count; i++)
-            {
-                var segment = segments[i];
-                var dn = BuildDnFromIndex(segments, i);
-                @if (i > 0)
-                {
-                    <span class="dn-breadcrumb-separator">&gt;</span>
-                }
-                <span class="dn-breadcrumb-segment" @onclick="() => NavigateToDn(dn)" title="@dn">@segment</span>
-            }
-        </div>
+        <DnBreadcrumb Dn="@Entry.Dn" OnNavigate="NavigateToDn" />
         <div class="d-flex gap-1 flex-shrink-0 ms-2 flex-wrap justify-content-end">
             @if (!_editMode)
             {
-                <button class="btn btn-sm btn-outline-primary" @onclick="EnterEditMode" title="Bearbeiten">
-                    Bearbeiten
+                <button class="btn btn-sm btn-outline-primary" @onclick="EnterEditMode" title="@L["Detail_Edit"]">
+                    <i class="bi bi-pencil-square"></i>
                 </button>
                 @if (HasPasswordAttribute())
                 {
-                    <button class="btn btn-sm @(_showPasswordTool ? "btn-info" : "btn-outline-info")" @onclick="() => ToggleTool(ref _showPasswordTool)" title="Passwort aendern">
-                        Passwort
+                    <button class="btn btn-sm @(_showPasswordTool ? "btn-info" : "btn-outline-info")" @onclick="() => ToggleTool(ref _showPasswordTool)" title="@L["Detail_ChangePasswordTitle"]">
+                        <i class="bi bi-key-fill"></i>
                     </button>
                 }
                 @if (IsGroupEntry())
                 {
-                    <button class="btn btn-sm @(_showGroupManager ? "btn-success" : "btn-outline-success")" @onclick="() => ToggleTool(ref _showGroupManager)" title="Mitglieder verwalten">
-                        Mitglieder
+                    <button class="btn btn-sm @(_showGroupManager ? "btn-success" : "btn-outline-success")" @onclick="() => ToggleTool(ref _showGroupManager)" title="@L["Detail_ManageMembersTitle"]">
+                        <i class="bi bi-people-fill"></i>
                     </button>
                 }
-                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleTool(ref _showMoveTool)" title="Verschieben/Umbenennen">
-                    Verschieben
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleTool(ref _showMoveTool)" title="@L["Detail_MoveRenameTitle"]">
+                    <i class="bi bi-arrows-move"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="CopyDn" title="DN kopieren">
-                    @(_copied == "dn" ? "Kopiert!" : "DN kopieren")
+                <button class="btn btn-sm btn-outline-secondary" @onclick="CopyDn" title="@L["Detail_CopyDn"]">
+                    <i class="bi @(_copied == "dn" ? "bi-clipboard-check" : "bi-clipboard")"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="ExportLdif" title="Als LDIF exportieren">
-                    LDIF
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ExportLdif" title="@L["Detail_ExportLdif"]">
+                    <i class="bi bi-file-earmark-arrow-down"></i> LDIF
                 </button>
                 @if (OnCopy.HasDelegate)
                 {
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => OnCopy.InvokeAsync(Entry)" title="Eintrag als Vorlage kopieren">
-                        Kopieren
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => OnCopy.InvokeAsync(Entry)" title="@L["Detail_CopyAsTemplate"]">
+                        <i class="bi bi-copy"></i>
                     </button>
                 }
                 @if (OnBookmark.HasDelegate)
                 {
-                    <button class="btn btn-sm @(IsBookmarked ? "btn-warning" : "btn-outline-warning")" @onclick="() => OnBookmark.InvokeAsync(Entry.Dn)" title="@(IsBookmarked ? "Lesezeichen entfernen" : "Lesezeichen setzen")">
-                        @(IsBookmarked ? "\u2605" : "\u2606")
+                    <button class="btn btn-sm @(IsBookmarked ? "btn-warning" : "btn-outline-warning")" @onclick="() => OnBookmark.InvokeAsync(Entry.Dn)" title="@(IsBookmarked ? L["Detail_BookmarkRemove"] : L["Detail_BookmarkSet"])">
+                        <i class="bi @(IsBookmarked ? "bi-star-fill" : "bi-star")"></i>
                     </button>
                 }
                 @if (OnDeleted.HasDelegate)
                 {
                     @if (_confirmDelete)
                     {
-                        <button class="btn btn-sm btn-danger" @onclick="DeleteEntry">Wirklich loeschen?</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _confirmDelete = false">Abbrechen</button>
+                        <button class="btn btn-sm btn-danger" @onclick="DeleteEntry">@L["Detail_ConfirmDelete"]</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _confirmDelete = false"><i class="bi bi-x-lg"></i></button>
                     }
                     else
                     {
-                        <button class="btn btn-sm btn-outline-danger" @onclick="() => _confirmDelete = true" title="Eintrag loeschen">
-                            Loeschen
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => _confirmDelete = true" title="@L["Detail_DeleteEntry"]">
+                            <i class="bi bi-trash3"></i>
                         </button>
                     }
                 }
@@ -78,9 +65,9 @@
                     {
                         <span class="spinner-border spinner-border-sm me-1"></span>
                     }
-                    Speichern
+                    <i class="bi bi-check-lg"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="CancelEdit">Abbrechen</button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="CancelEdit"><i class="bi bi-x-lg"></i></button>
             }
         </div>
     </div>
@@ -119,44 +106,22 @@
     @* Move/Rename Tool *@
     @if (_showMoveTool)
     {
-        <div class="tool-panel mb-3">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <strong class="small">Verschieben / Umbenennen</strong>
-                <button class="btn btn-sm btn-outline-secondary py-0 px-1" @onclick="() => _showMoveTool = false">X</button>
-            </div>
-            <div class="mb-2">
-                <label class="form-label small mb-0">Neuer RDN</label>
-                <input type="text" class="form-control form-control-sm" @bind="_moveNewRdn" placeholder="@GetCurrentRdn()" />
-            </div>
-            <div class="mb-2">
-                <label class="form-label small mb-0">Neuer Parent DN (leer = gleicher Ort)</label>
-                <input type="text" class="form-control form-control-sm" @bind="_moveNewParent" placeholder="@GetCurrentParent()" />
-            </div>
-            @if (!string.IsNullOrEmpty(_moveError))
-            {
-                <div class="alert alert-danger small py-1 px-2">@_moveError</div>
-            }
-            <button class="btn btn-sm btn-primary" @onclick="ExecuteMove" disabled="@_moving">
-                @if (_moving)
-                {
-                    <span class="spinner-border spinner-border-sm me-1"></span>
-                }
-                Verschieben
-            </button>
-        </div>
+        <MoveRenameTool Entry="Entry" LdapService="LdapService"
+                        OnClose="() => _showMoveTool = false"
+                        OnMoved="HandleMoveCompleted" />
     }
 
     @if (Entry.Attributes.Count == 0)
     {
-        <p class="text-muted">Keine Attribute vorhanden.</p>
+        <p class="text-muted">@L["Detail_NoAttributes"]</p>
     }
     else if (_editMode)
     {
         <table class="table table-sm table-striped edit-table">
             <thead>
                 <tr>
-                    <th style="width: 30%">Attribut</th>
-                    <th>Wert(e)</th>
+                    <th style="width: 30%">@L["Detail_Attribute"]</th>
+                    <th>@L["Detail_Values"]</th>
                 </tr>
             </thead>
             <tbody>
@@ -173,10 +138,10 @@
                                     <input type="text" class="form-control form-control-sm edit-input"
                                            value="@attr.Value[valueIdx]"
                                            @onchange="(e) => UpdateEditValue(attrName, valueIdx, e.Value?.ToString() ?? string.Empty)" />
-                                    <button class="btn btn-sm btn-outline-danger edit-remove-btn" @onclick="() => RemoveEditValue(attrName, valueIdx)" title="Wert entfernen">X</button>
+                                    <button class="btn btn-sm btn-outline-danger edit-remove-btn" @onclick="() => RemoveEditValue(attrName, valueIdx)" title="@L["Detail_RemoveValue"]"><i class="bi bi-x"></i></button>
                                 </div>
                             }
-                            <button class="btn btn-sm btn-outline-secondary edit-add-value-btn" @onclick="() => AddEditValue(attrName)">+ Wert</button>
+                            <button class="btn btn-sm btn-outline-secondary edit-add-value-btn" @onclick="() => AddEditValue(attrName)">@L["Detail_AddValue"]</button>
                         </td>
                     </tr>
                 }
@@ -186,15 +151,15 @@
         <div class="edit-new-attribute">
             <div class="d-flex gap-1 align-items-end">
                 <div>
-                    <label class="form-label small mb-0">Neues Attribut</label>
+                    <label class="form-label small mb-0">@L["Detail_NewAttribute"]</label>
                     <AttributeAutocomplete Value="@_newAttrName" ValueChanged="(v) => _newAttrName = v"
-                                           ExtraSuggestions="@(_schemaAttributes)" Placeholder="Attribut-Name" />
+                                           ExtraSuggestions="@(_schemaAttributes)" Placeholder="@L["Autocomplete_Placeholder"]" />
                 </div>
                 <div class="flex-grow-1">
-                    <label class="form-label small mb-0">Wert</label>
-                    <input type="text" class="form-control form-control-sm" @bind="_newAttrValue" placeholder="Wert" />
+                    <label class="form-label small mb-0">@L["Detail_Value"]</label>
+                    <input type="text" class="form-control form-control-sm" @bind="_newAttrValue" placeholder="@L["Detail_Value"]" />
                 </div>
-                <button class="btn btn-sm btn-outline-primary" @onclick="AddNewAttribute" disabled="@(string.IsNullOrWhiteSpace(_newAttrName))">Hinzufuegen</button>
+                <button class="btn btn-sm btn-outline-primary" @onclick="AddNewAttribute" disabled="@(string.IsNullOrWhiteSpace(_newAttrName))">@L["Detail_Add"]</button>
             </div>
         </div>
     }
@@ -203,8 +168,8 @@
         <table class="table table-sm table-striped">
             <thead>
                 <tr>
-                    <th style="width: 30%">Attribut</th>
-                    <th>Wert(e)</th>
+                    <th style="width: 30%">@L["Detail_Attribute"]</th>
+                    <th>@L["Detail_Values"]</th>
                 </tr>
             </thead>
             <tbody>
@@ -218,14 +183,26 @@
                                 @if (IsMemberAttribute(attr.Key) && LooksLikeDn(attr.Value[0]))
                                 {
                                     var memberDn = attr.Value[0];
-                                    <span class="member-link" @onclick="() => NavigateToDn(memberDn)" title="Zum Eintrag navigieren">@memberDn</span>
+                                    <span class="member-link" @onclick="() => NavigateToDn(memberDn)" title="@L["Detail_NavigateToEntry"]">@memberDn</span>
                                 }
                                 else
                                 {
-                                    <span class="attr-value-text" @onclick="() => CopyValue(attr.Value[0])" title="Klicken zum Kopieren">@attr.Value[0]</span>
-                                    @if (_copied == $"{attr.Key}:0")
+                                    @if (IsBinaryPlaceholder(attr.Value[0]))
                                     {
-                                        <span class="text-success small ms-1">Kopiert!</span>
+                                        <span class="text-muted small">@attr.Value[0]</span>
+                                        @if (IsImageAttribute(attr.Key) || IsCertAttribute(attr.Key))
+                                        {
+                                            <BinaryPreview Dn="@Entry.Dn" AttributeName="@attr.Key" LdapService="LdapService"
+                                                           IsImage="@IsImageAttribute(attr.Key)" IsCert="@IsCertAttribute(attr.Key)" />
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="attr-value-text" @onclick="() => CopyValue(attr.Value[0])" title="@L["Detail_ClickToCopy"]">@attr.Value[0]</span>
+                                        @if (_copied == $"{attr.Key}:0")
+                                        {
+                                            <span class="text-success small ms-1">@L["Detail_Copied"]</span>
+                                        }
                                     }
                                 }
                             }
@@ -240,14 +217,14 @@
                                         <li>
                                             @if (IsMemberAttribute(attr.Key) && LooksLikeDn(valCopy))
                                             {
-                                                <span class="member-link" @onclick="() => NavigateToDn(valCopy)" title="Zum Eintrag navigieren">@valCopy</span>
+                                                <span class="member-link" @onclick="() => NavigateToDn(valCopy)" title="@L["Detail_NavigateToEntry"]">@valCopy</span>
                                             }
                                             else
                                             {
-                                                <span class="attr-value-text" @onclick="() => CopyValue(valCopy, copyKey)" title="Klicken zum Kopieren">@val</span>
+                                                <span class="attr-value-text" @onclick="() => CopyValue(valCopy, copyKey)" title="@L["Detail_ClickToCopy"]">@val</span>
                                                 @if (_copied == copyKey)
                                                 {
-                                                    <span class="text-success small ms-1">Kopiert!</span>
+                                                    <span class="text-success small ms-1">@L["Detail_Copied"]</span>
                                                 }
                                             }
                                         </li>
@@ -309,10 +286,6 @@
     private bool _showPasswordTool;
     private bool _showGroupManager;
     private bool _showMoveTool;
-    private string _moveNewRdn = "";
-    private string _moveNewParent = "";
-    private string? _moveError;
-    private bool _moving;
 
     private static readonly HashSet<string> MemberAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -325,8 +298,19 @@
     };
 
     private static bool IsMemberAttribute(string attrName) => MemberAttributes.Contains(attrName);
-
     private static bool LooksLikeDn(string value) => value.Contains('=') && value.Contains(',');
+    private static bool IsBinaryPlaceholder(string value) => value.StartsWith("[Binary:");
+
+    private static bool IsImageAttribute(string name) =>
+        name.Equals("jpegPhoto", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("photo", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("thumbnailPhoto", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsCertAttribute(string name) =>
+        name.Equals("userCertificate", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("userCertificate;binary", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("cACertificate", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("userSMIMECertificate", StringComparison.OrdinalIgnoreCase);
 
     private bool HasPasswordAttribute()
     {
@@ -356,59 +340,15 @@
         tool = newState;
     }
 
-    private string GetCurrentRdn()
+    private async Task HandleMoveCompleted(string newDn)
     {
-        var idx = Entry.Dn.IndexOf(',');
-        return idx > 0 ? Entry.Dn[..idx] : Entry.Dn;
-    }
-
-    private string GetCurrentParent()
-    {
-        var idx = Entry.Dn.IndexOf(',');
-        return idx > 0 ? Entry.Dn[(idx + 1)..] : "";
-    }
-
-    // Move/Rename
-    private async Task ExecuteMove()
-    {
-        _moveError = null;
-        var newRdn = string.IsNullOrWhiteSpace(_moveNewRdn) ? GetCurrentRdn() : _moveNewRdn.Trim();
-        var newParent = string.IsNullOrWhiteSpace(_moveNewParent) ? null : _moveNewParent.Trim();
-
-        // Nothing changed
-        if (newRdn == GetCurrentRdn() && newParent == null)
-        {
-            _moveError = "Keine Aenderung angegeben.";
-            return;
-        }
-
-        _moving = true;
-        StateHasChanged();
-
-        try
-        {
-            await LdapService.MoveEntry(Entry.Dn, newRdn, newParent);
-            var newDn = newParent != null ? $"{newRdn},{newParent}" : $"{newRdn},{GetCurrentParent()}";
-            _showMoveTool = false;
-            _moveNewRdn = "";
-            _moveNewParent = "";
-
-            if (OnMoved.HasDelegate)
-                await OnMoved.InvokeAsync(newDn);
-        }
-        catch (Exception ex)
-        {
-            _moveError = $"Fehler: {ex.Message}";
-        }
-        finally
-        {
-            _moving = false;
-        }
+        _showMoveTool = false;
+        if (OnMoved.HasDelegate)
+            await OnMoved.InvokeAsync(newDn);
     }
 
     private async Task HandleToolChanged()
     {
-        // Reload entry after tool changes
         try
         {
             var updated = await LdapService.GetEntry(Entry.Dn);
@@ -431,12 +371,8 @@
         _showPasswordTool = false;
         _showGroupManager = false;
         _showMoveTool = false;
-        _editAttributes = Entry.Attributes.ToDictionary(
-            a => a.Key,
-            a => new List<string>(a.Value));
-        _originalAttributes = Entry.Attributes.ToDictionary(
-            a => a.Key,
-            a => new List<string>(a.Value));
+        _editAttributes = Entry.Attributes.ToDictionary(a => a.Key, a => new List<string>(a.Value));
+        _originalAttributes = Entry.Attributes.ToDictionary(a => a.Key, a => new List<string>(a.Value));
 
         try
         {
@@ -446,20 +382,11 @@
                 .SelectMany(a => a.Value)
                 .ToList();
 
-            if (objectClasses.Count > 0)
-            {
-                var allowed = schema.GetAllowedAttributes(objectClasses);
-                _schemaAttributes = allowed.OrderBy(a => a, StringComparer.OrdinalIgnoreCase).ToArray();
-            }
-            else
-            {
-                _schemaAttributes = schema.AttributeTypes.Select(a => a.Name).ToArray();
-            }
+            _schemaAttributes = objectClasses.Count > 0
+                ? schema.GetAllowedAttributes(objectClasses).OrderBy(a => a, StringComparer.OrdinalIgnoreCase).ToArray()
+                : schema.AttributeTypes.Select(a => a.Name).ToArray();
         }
-        catch
-        {
-            _schemaAttributes = null;
-        }
+        catch { _schemaAttributes = null; }
     }
 
     private void CancelEdit()
@@ -535,11 +462,11 @@
             }
 
             _editMode = false;
-            _success = "Aenderungen gespeichert.";
+            _success = L["Detail_ChangesSaved"];
         }
         catch (Exception ex)
         {
-            _error = $"Fehler beim Speichern: {ex.Message}";
+            _error = string.Format(L["Detail_SaveError"], ex.Message);
         }
         finally
         {
@@ -595,37 +522,12 @@
         }
         catch (Exception ex)
         {
-            _error = $"Fehler beim Loeschen: {ex.Message}";
+            _error = string.Format(L["Detail_DeleteError"], ex.Message);
             _confirmDelete = false;
         }
     }
 
     // Navigation
-    private static List<string> ParseDnSegments(string dn)
-    {
-        var segments = new List<string>();
-        var current = new System.Text.StringBuilder();
-        bool escaped = false;
-
-        foreach (var c in dn)
-        {
-            if (escaped) { current.Append(c); escaped = false; continue; }
-            if (c == '\\') { current.Append(c); escaped = true; continue; }
-            if (c == ',')
-            {
-                if (current.Length > 0) { segments.Add(current.ToString().Trim()); current.Clear(); }
-                continue;
-            }
-            current.Append(c);
-        }
-
-        if (current.Length > 0) segments.Add(current.ToString().Trim());
-        return segments;
-    }
-
-    private static string BuildDnFromIndex(List<string> segments, int startIndex) =>
-        string.Join(",", segments.Skip(startIndex));
-
     private async Task NavigateToDn(string dn)
     {
         if (OnNavigate.HasDelegate)

@@ -1,25 +1,23 @@
 @page "/statistics"
-@using System.Text.Json
-@using LdapViewer.Models
-@using LdapViewer.Services
 @inject ConnectionManager ConnMgr
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject IStringLocalizer<Loc> L
 @rendermode InteractiveServer
 
-<PageTitle>Open LDAP Viewer - Statistiken</PageTitle>
+<PageTitle>@L["PageTitle_Statistics"]</PageTitle>
 
 @if (_reconnecting)
 {
     <div class="container mt-4 text-center">
-        <span class="spinner-border me-2"></span> Verbindung wird wiederhergestellt...
+        <span class="spinner-border me-2"></span> @L["Browser_Reconnecting"]
     </div>
 }
 else if (!ConnMgr.IsConnected)
 {
     <div class="container mt-4">
         <div class="alert alert-warning">
-            Nicht verbunden. <a href="/">Zur Verbindungsseite</a>
+            @L["Browser_NotConnected"] <a href="/">@L["Browser_ToConnectionPage"]</a>
         </div>
     </div>
 }
@@ -27,13 +25,13 @@ else
 {
     <div class="container-fluid mt-3 px-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h4 class="mb-0">Verzeichnis-Statistiken</h4>
+            <h4 class="mb-0">@L["Stats_Title"]</h4>
             <button class="btn btn-primary" @onclick="LoadStatistics" disabled="@_loading">
                 @if (_loading)
                 {
                     <span class="spinner-border spinner-border-sm me-1"></span>
                 }
-                @(_objectClassStats == null ? "Statistiken laden" : "Aktualisieren")
+                <i class="bi bi-bar-chart me-1"></i>@(_objectClassStats == null ? L["Stats_Load"] : L["Stats_Refresh"])
             </button>
         </div>
 
@@ -49,7 +47,7 @@ else
                     <div class="card">
                         <div class="card-body text-center">
                             <h2 class="mb-0">@_totalEntries</h2>
-                            <small class="text-muted">Eintraege gesamt</small>
+                            <small class="text-muted">@L["Stats_TotalEntries"]</small>
                         </div>
                     </div>
                 </div>
@@ -65,7 +63,7 @@ else
                     <div class="card">
                         <div class="card-body text-center">
                             <h2 class="mb-0">@(_ouStats?.Count ?? 0)</h2>
-                            <small class="text-muted">Organisationseinheiten</small>
+                            <small class="text-muted">@L["Stats_OrgUnits"]</small>
                         </div>
                     </div>
                 </div>
@@ -75,15 +73,15 @@ else
                 <div class="col-md-6 mb-3">
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="mb-0">Nach ObjectClass</h5>
+                            <h5 class="mb-0">@L["Stats_ByObjectClass"]</h5>
                         </div>
                         <div class="card-body" style="max-height: 500px; overflow-y: auto;">
                             <table class="table table-sm">
                                 <thead>
                                     <tr>
                                         <th>ObjectClass</th>
-                                        <th style="width: 100px">Anzahl</th>
-                                        <th style="width: 40%">Verteilung</th>
+                                        <th style="width: 100px">@L["Stats_Count"]</th>
+                                        <th style="width: 40%">@L["Stats_Distribution"]</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -110,7 +108,7 @@ else
                 <div class="col-md-6 mb-3">
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="mb-0">Nach Organisationseinheit (OU)</h5>
+                            <h5 class="mb-0">@L["Stats_ByOu"]</h5>
                         </div>
                         <div class="card-body" style="max-height: 500px; overflow-y: auto;">
                             @if (_ouStats != null && _ouStats.Count > 0)
@@ -119,8 +117,8 @@ else
                                     <thead>
                                         <tr>
                                             <th>OU</th>
-                                            <th style="width: 100px">Anzahl</th>
-                                            <th style="width: 40%">Verteilung</th>
+                                            <th style="width: 100px">@L["Stats_Count"]</th>
+                                            <th style="width: 40%">@L["Stats_Distribution"]</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -143,7 +141,7 @@ else
                             }
                             else
                             {
-                                <p class="text-muted">Keine OUs gefunden.</p>
+                                <p class="text-muted">@L["Stats_NoOus"]</p>
                             }
                         </div>
                     </div>
@@ -153,7 +151,7 @@ else
         else if (!_loading)
         {
             <div class="text-muted">
-                Klicken Sie auf "Statistiken laden" um die Verzeichnis-Statistiken zu berechnen.
+                @L["Stats_ClickLoad"]
             </div>
         }
     </div>
@@ -194,27 +192,10 @@ else
 
     private async Task TryReconnect()
     {
-        try
-        {
-            var json = await JS.InvokeAsync<string>("connectionStorage.loadLastConnection");
-            if (string.IsNullOrEmpty(json)) return;
-
-            var settings = JsonSerializer.Deserialize<LdapConnectionSettings>(json);
-            if (settings == null) return;
-
-            _reconnecting = true;
-            StateHasChanged();
-
-            await Task.Run(() => ConnMgr.AddConnection(settings));
-        }
-        catch
-        {
-            // Reconnect failed
-        }
-        finally
-        {
-            _reconnecting = false;
-        }
+        _reconnecting = true;
+        StateHasChanged();
+        await ConnMgr.TryReconnectFromStorage(JS);
+        _reconnecting = false;
     }
 
     private async Task LoadStatistics()
@@ -236,7 +217,7 @@ else
         }
         catch (Exception ex)
         {
-            _error = $"Fehler beim Laden der Statistiken: {ex.Message}";
+            _error = string.Format(L["Stats_LoadError"], ex.Message);
         }
         finally
         {

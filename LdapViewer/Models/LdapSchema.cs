@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 namespace LdapViewer.Models;
 
 public class LdapSchema

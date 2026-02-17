@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="50%" style="stop-color:#16213e"/>
+      <stop offset="100%" style="stop-color:#0f3460"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3a86ff"/>
+      <stop offset="100%" style="stop-color:#0d6efd"/>
+    </linearGradient>
+    <linearGradient id="node" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#5ba3ff"/>
+      <stop offset="100%" style="stop-color:#3a86ff"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded square -->
+  <rect width="512" height="512" rx="96" ry="96" fill="url(#bg)"/>
+  <!-- Tree structure lines -->
+  <line x1="180" y1="160" x2="180" y2="370" stroke="#3a86ff" stroke-width="3" opacity="0.3"/>
+  <line x1="180" y1="220" x2="300" y2="220" stroke="#3a86ff" stroke-width="3" opacity="0.3"/>
+  <line x1="180" y1="296" x2="300" y2="296" stroke="#3a86ff" stroke-width="3" opacity="0.3"/>
+  <line x1="180" y1="370" x2="300" y2="370" stroke="#3a86ff" stroke-width="3" opacity="0.3"/>
+  <!-- Root node -->
+  <circle cx="180" cy="140" r="28" fill="url(#accent)"/>
+  <circle cx="180" cy="140" r="16" fill="none" stroke="#fff" stroke-width="3"/>
+  <circle cx="180" cy="140" r="6" fill="#fff"/>
+  <!-- Child nodes -->
+  <rect x="290" y="204" width="120" height="32" rx="6" fill="url(#node)" opacity="0.9"/>
+  <rect x="290" y="280" width="120" height="32" rx="6" fill="url(#node)" opacity="0.7"/>
+  <rect x="290" y="354" width="120" height="32" rx="6" fill="url(#node)" opacity="0.5"/>
+  <!-- Node text lines -->
+  <line x1="302" y1="220" x2="398" y2="220" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <line x1="302" y1="296" x2="380" y2="296" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <line x1="302" y1="370" x2="365" y2="370" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <!-- Junction dots -->
+  <circle cx="180" cy="220" r="6" fill="#3a86ff"/>
+  <circle cx="180" cy="296" r="6" fill="#3a86ff"/>
+  <circle cx="180" cy="370" r="6" fill="#3a86ff"/>
+  <!-- LDAP text -->
+  <text x="256" y="462" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="52" fill="#e0e0e0" letter-spacing="8">LDAP</text>
+</svg>

@@ -1,16 +1,29 @@
 @inherits LayoutComponentBase
+@inject IStringLocalizer<Loc> L
+@inject NavigationManager Navigation
 
 <div class="page">
-    <nav class="navbar navbar-dark bg-dark px-3">
-        <a class="navbar-brand" href="">Open LDAP Viewer</a>
+    <nav class="navbar navbar-dark ldap-navbar px-3">
+        <a class="navbar-brand d-flex align-items-center" href="">
+            <img src="favicon.svg" alt="" width="28" height="28" class="me-2" />
+            Open LDAP Viewer
+        </a>
         <div class="d-flex align-items-center">
-            <NavLink class="nav-link text-light me-3" href="" Match="NavLinkMatch.All">Verbindung</NavLink>
-            <NavLink class="nav-link text-light me-3" href="browser">Browser</NavLink>
-            <NavLink class="nav-link text-light me-3" href="compare">Vergleich</NavLink>
-            <NavLink class="nav-link text-light me-3" href="ldif-import">LDIF Import</NavLink>
-            <NavLink class="nav-link text-light me-3" href="schema">Schema</NavLink>
-            <NavLink class="nav-link text-light me-3" href="statistics">Statistiken</NavLink>
-            <button id="dark-mode-btn" class="dark-mode-toggle" onclick="toggleDarkMode()" title="Dunkelmodus umschalten"></button>
+            <NavLink class="nav-link text-light me-3" href="" Match="NavLinkMatch.All"><i class="bi bi-plug me-1"></i>@L["Nav_Connection"]</NavLink>
+            <NavLink class="nav-link text-light me-3" href="browser"><i class="bi bi-diagram-3 me-1"></i>@L["Nav_Browser"]</NavLink>
+            <NavLink class="nav-link text-light me-3" href="compare"><i class="bi bi-layout-split me-1"></i>@L["Nav_Compare"]</NavLink>
+            <NavLink class="nav-link text-light me-3" href="ldif-import"><i class="bi bi-upload me-1"></i>@L["Nav_LdifImport"]</NavLink>
+            <NavLink class="nav-link text-light me-3" href="schema"><i class="bi bi-database me-1"></i>@L["Nav_Schema"]</NavLink>
+            <NavLink class="nav-link text-light me-3" href="statistics"><i class="bi bi-bar-chart me-1"></i>@L["Nav_Statistics"]</NavLink>
+            <select class="form-select form-select-sm me-2" style="width: auto; background-color: #343a40; color: #fff; border-color: #495057;"
+                    onchange="setLanguageCookie(this.value); location.reload();">
+                <option value="de" selected="@(_currentCulture == "de")">DE</option>
+                <option value="en" selected="@(_currentCulture == "en")">EN</option>
+            </select>
+            <button id="dark-mode-btn" class="dark-mode-toggle" onclick="toggleDarkMode()" title="@L["Nav_DarkModeToggle"]">
+                <i class="bi bi-moon-fill dark-mode-icon-moon"></i>
+                <i class="bi bi-sun-fill dark-mode-icon-sun"></i>
+            </button>
         </div>
     </nav>
 
@@ -24,3 +37,12 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">X</span>
 </div>
+
+@code {
+    private string _currentCulture = "de";
+
+    protected override void OnInitialized()
+    {
+        _currentCulture = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+    }
+}

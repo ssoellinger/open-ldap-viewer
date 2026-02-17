@@ -57,15 +57,4 @@ public static class LdapAttributeSuggestions
         "roomNumber", "carLicense", "info", "comment"
     ];
 
-    public static string[] Filter(string input)
-    {
-        if (string.IsNullOrWhiteSpace(input))
-            return Common;
-
-        return Common
-            .Where(a => a.Contains(input, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(a => !a.StartsWith(input, StringComparison.OrdinalIgnoreCase))
-            .ThenBy(a => a)
-            .ToArray();
-    }
 }

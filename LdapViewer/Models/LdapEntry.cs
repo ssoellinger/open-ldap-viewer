@@ -9,15 +9,16 @@ public class LdapEntry
     /// <summary>
     /// Returns the RDN (first component of the DN) for display in the tree.
     /// </summary>
-    public string DisplayName
-    {
-        get
-        {
-            var firstPart = Dn.Split(',')[0];
-            var eqIndex = firstPart.IndexOf('=');
-            return eqIndex >= 0 ? firstPart[(eqIndex + 1)..] : firstPart;
-        }
-    }
+    public string DisplayName => GetRdn(Dn);
 
-    public bool HasChildren { get; set; }
+    /// <summary>
+    /// Extracts the RDN display value from any DN string (e.g. "cn=Max,ou=People,dc=test" -> "Max").
+    /// </summary>
+    public static string GetRdn(string dn)
+    {
+        var idx = dn.IndexOf(',');
+        var rdn = idx > 0 ? dn[..idx] : dn;
+        var eqIdx = rdn.IndexOf('=');
+        return eqIdx > 0 ? rdn[(eqIdx + 1)..] : rdn;
+    }
 }

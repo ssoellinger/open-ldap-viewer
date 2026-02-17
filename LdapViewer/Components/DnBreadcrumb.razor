@@ -1,0 +1,52 @@
+<div class="dn-breadcrumb mb-0">
+    @{ var segments = ParseDnSegments(Dn); }
+    @for (int i = 0; i < segments.Count; i++)
+    {
+        var segment = segments[i];
+        var dn = BuildDnFromIndex(segments, i);
+        @if (i > 0)
+        {
+            <span class="dn-breadcrumb-separator">&gt;</span>
+        }
+        <span class="dn-breadcrumb-segment" @onclick="() => NavigateTo(dn)" title="@dn">@segment</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Dn { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> OnNavigate { get; set; }
+
+    private async Task NavigateTo(string dn)
+    {
+        if (OnNavigate.HasDelegate)
+            await OnNavigate.InvokeAsync(dn);
+    }
+
+    private static List<string> ParseDnSegments(string dn)
+    {
+        var segments = new List<string>();
+        var current = new System.Text.StringBuilder();
+        bool escaped = false;
+
+        foreach (var c in dn)
+        {
+            if (escaped) { current.Append(c); escaped = false; continue; }
+            if (c == '\\') { current.Append(c); escaped = true; continue; }
+            if (c == ',')
+            {
+                if (current.Length > 0) { segments.Add(current.ToString().Trim()); current.Clear(); }
+                continue;
+            }
+            current.Append(c);
+        }
+
+        if (current.Length > 0) segments.Add(current.ToString().Trim());
+        return segments;
+    }
+
+    private static string BuildDnFromIndex(List<string> segments, int startIndex) =>
+        string.Join(",", segments.Skip(startIndex));
+}

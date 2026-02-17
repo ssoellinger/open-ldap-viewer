@@ -1,13 +1,11 @@
 @page "/"
-@using System.Text.Json
-@using LdapViewer.Models
-@using LdapViewer.Services
 @inject ConnectionManager ConnMgr
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject IStringLocalizer<Loc> L
 @rendermode InteractiveServer
 
-<PageTitle>Open LDAP Viewer - Verbindung</PageTitle>
+<PageTitle>@L["PageTitle_Connection"]</PageTitle>
 
 <div class="container mt-4">
     <div class="row justify-content-center">
@@ -17,7 +15,7 @@
             {
                 <div class="card mb-3">
                     <div class="card-header">
-                        <h5 class="mb-0">Gespeicherte Verbindungen</h5>
+                        <h5 class="mb-0">@L["Home_SavedConnections"]</h5>
                     </div>
                     <div class="list-group list-group-flush">
                         @foreach (var conn in _savedConnections)
@@ -31,8 +29,8 @@
                                     <strong>@conn.Name</strong>
                                     <small class="text-muted ms-2">@conn.Server:@conn.Port - @conn.BaseDn</small>
                                 </a>
-                                <button class="btn btn-sm btn-outline-danger ms-2" @onclick="() => DeleteConnection(conn)" title="Loeschen">
-                                    X
+                                <button class="btn btn-sm btn-outline-danger ms-2" @onclick="() => DeleteConnection(conn)" title="@L["Home_Delete"]">
+                                    <i class="bi bi-trash3"></i>
                                 </button>
                             </div>
                         }
@@ -42,21 +40,21 @@
 
             <div class="card">
                 <div class="card-header">
-                    <h4 class="mb-0">LDAP-Verbindung</h4>
+                    <h4 class="mb-0">@L["Home_LdapConnection"]</h4>
                 </div>
                 <div class="card-body">
                     <EditForm Model="@_settings" OnValidSubmit="HandleConnect" FormName="ldapConnect">
                         <DataAnnotationsValidator />
 
                         <div class="mb-3">
-                            <label class="form-label">Server</label>
+                            <label class="form-label">@L["Home_Server"]</label>
                             <InputText class="form-control" @bind-Value="_settings.Server" placeholder="ldap.example.com" />
                             <ValidationMessage For="@(() => _settings.Server)" />
                         </div>
 
                         <div class="row mb-3">
                             <div class="col-8">
-                                <label class="form-label">Port</label>
+                                <label class="form-label">@L["Home_Port"]</label>
                                 <InputNumber class="form-control" @bind-Value="_settings.Port" />
                                 <ValidationMessage For="@(() => _settings.Port)" />
                             </div>
@@ -69,18 +67,18 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Base DN</label>
+                            <label class="form-label">@L["Home_BaseDn"]</label>
                             <InputText class="form-control" @bind-Value="_settings.BaseDn" placeholder="dc=example,dc=com" />
                             <ValidationMessage For="@(() => _settings.BaseDn)" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Benutzername (optional)</label>
+                            <label class="form-label">@L["Home_Username"]</label>
                             <InputText class="form-control" @bind-Value="_settings.Username" placeholder="cn=admin,dc=example,dc=com" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Passwort (optional)</label>
+                            <label class="form-label">@L["Home_Password"]</label>
                             <InputText class="form-control" type="password" @bind-Value="_settings.Password" />
                         </div>
 
@@ -91,7 +89,7 @@
 
                         @if (_testSuccess)
                         {
-                            <div class="alert alert-success">Verbindung erfolgreich!</div>
+                            <div class="alert alert-success">@L["Home_ConnectionSuccess"]</div>
                         }
 
                         <div class="d-flex gap-2">
@@ -100,17 +98,17 @@
                                 {
                                     <span class="spinner-border spinner-border-sm me-2"></span>
                                 }
-                                Verbinden
+                                <i class="bi bi-plug me-1"></i>@L["Home_Connect"]
                             </button>
                             <button type="button" class="btn btn-outline-info" @onclick="TestConnection" disabled="@_testing">
                                 @if (_testing)
                                 {
                                     <span class="spinner-border spinner-border-sm me-2"></span>
                                 }
-                                Testen
+                                <i class="bi bi-speedometer me-1"></i>@L["Home_Test"]
                             </button>
                             <button type="button" class="btn btn-outline-secondary" @onclick="SaveConnection">
-                                Speichern
+                                <i class="bi bi-floppy me-1"></i>@L["Home_Save"]
                             </button>
                         </div>
                     </EditForm>
@@ -121,16 +119,16 @@
             {
                 <div class="card mt-3">
                     <div class="card-header">
-                        <h5 class="mb-0">Passwort pruefen</h5>
+                        <h5 class="mb-0">@L["Home_PasswordCheck"]</h5>
                     </div>
                     <div class="card-body">
-                        <p class="text-muted small">Pruefen Sie, ob ein LDAP-Bind mit einem bestimmten Benutzer und Passwort erfolgreich ist.</p>
+                        <p class="text-muted small">@L["Home_PasswordCheckDesc"]</p>
                         <div class="mb-3">
-                            <label class="form-label">Benutzer-DN</label>
+                            <label class="form-label">@L["Home_UserDn"]</label>
                             <input type="text" class="form-control" @bind="_testUserDn" placeholder="cn=user,ou=People,dc=example,dc=com" />
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Passwort</label>
+                            <label class="form-label">@L["Home_PasswordLabel"]</label>
                             <input type="password" class="form-control" @bind="_testUserPassword" />
                         </div>
 
@@ -141,7 +139,7 @@
 
                         @if (_testBindSuccess)
                         {
-                            <div class="alert alert-success">Bind erfolgreich! Benutzer und Passwort sind korrekt.</div>
+                            <div class="alert alert-success">@L["Home_BindSuccess"]</div>
                         }
 
                         <button class="btn btn-outline-primary" @onclick="TestUserBind" disabled="@_testingBind">
@@ -149,7 +147,7 @@
                             {
                                 <span class="spinner-border spinner-border-sm me-1"></span>
                             }
-                            Pruefen
+                            @L["Home_Check"]
                         </button>
                     </div>
                 </div>
@@ -206,7 +204,7 @@
     {
         if (string.IsNullOrWhiteSpace(_settings.Server))
         {
-            _errorMessage = "Server muss ausgefuellt sein um zu speichern.";
+            _errorMessage = L["Home_ServerRequired"];
             return;
         }
 
@@ -280,7 +278,7 @@
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Verbindung fehlgeschlagen: {ex.Message}";
+            _errorMessage = string.Format(L["Home_ConnectionFailed"], ex.Message);
         }
         finally
         {
@@ -304,7 +302,7 @@
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Verbindung fehlgeschlagen: {ex.Message}";
+            _errorMessage = string.Format(L["Home_ConnectionFailed"], ex.Message);
         }
         finally
         {
@@ -316,7 +314,7 @@
     {
         if (string.IsNullOrWhiteSpace(_testUserDn) || string.IsNullOrWhiteSpace(_testUserPassword))
         {
-            _testBindError = "Benutzer-DN und Passwort muessen ausgefuellt sein.";
+            _testBindError = L["Home_UserDnPasswordRequired"];
             return;
         }
 
@@ -332,7 +330,7 @@
         }
         catch (Exception ex)
         {
-            _testBindError = $"Bind fehlgeschlagen: {ex.Message}";
+            _testBindError = string.Format(L["Home_BindFailed"], ex.Message);
         }
         finally
         {

@@ -1,0 +1,282 @@
+@inject IJSRuntime JS
+@inject IStringLocalizer<Loc> L
+
+<div class="search-bar">
+    <div class="d-flex gap-1 mb-1">
+        <select class="form-select form-select-sm" style="width: auto" @bind="_searchAttribute">
+            <option value="">@L["Search_LdapFilter"]</option>
+            <option value="cn">CN (Name)</option>
+            <option value="uid">UID</option>
+            <option value="sn">@L["Search_SnSurname"]</option>
+            <option value="givenName">@L["Search_GivenName"]</option>
+            <option value="mail">Mail</option>
+            <option value="objectClass">ObjectClass</option>
+            <option value="ou">OU</option>
+            <option value="telephoneNumber">@L["Search_Phone"]</option>
+            <option value="displayName">@L["Search_DisplayName"]</option>
+        </select>
+        <div class="input-group input-group-sm flex-grow-1 search-history-dropdown">
+            <input type="text" class="form-control"
+                   placeholder="@(_searchAttribute == "" ? L["Search_FilterPlaceholder"] : L["Search_TermPlaceholder"])"
+                   @bind="_searchValue"
+                   @bind:event="oninput"
+                   @onkeydown="HandleSearchKey"
+                   @onfocus="() => _showSearchHistory = true"
+                   @onblur="HideSearchHistoryDelayed" />
+            <button class="btn btn-primary" @onclick="ExecuteSearch" disabled="@_searching">
+                @if (_searching)
+                {
+                    <span class="spinner-border spinner-border-sm"></span>
+                }
+                else
+                {
+                    <i class="bi bi-search"></i>
+                }
+            </button>
+            @if (HasResults)
+            {
+                <button class="btn btn-outline-secondary" @onclick="ClearSearch"><i class="bi bi-x-lg"></i></button>
+            }
+            @if (_showSearchHistory && _searchHistory.Count > 0)
+            {
+                <div class="search-history-list">
+                    @foreach (var item in _searchHistory)
+                    {
+                        var histItem = item;
+                        <div class="search-history-item" @onmousedown="() => ApplySearchHistory(histItem)">
+                            <span>@(string.IsNullOrEmpty(histItem.Attribute) ? histItem.Value : $"{histItem.Attribute}={histItem.Value}")</span>
+                            @if (!string.IsNullOrEmpty(histItem.Attribute))
+                            {
+                                <span class="badge bg-secondary">@histItem.Attribute</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-info">Filter</span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+    @if (_savedSearches.Count > 0 || HasResults)
+    {
+        <div class="d-flex gap-1 flex-wrap align-items-center">
+            @foreach (var ss in _savedSearches)
+            {
+                var saved = ss;
+                <span class="badge bg-primary saved-search-badge" @onclick="() => ApplySavedSearch(saved)" title="@saved.Filter">
+                    @saved.Name
+                    <button class="btn-close btn-close-white ms-1" style="font-size: 0.5rem;" @onclick:stopPropagation="true" @onclick="() => RemoveSavedSearch(saved)"></button>
+                </span>
+            }
+            @if (HasResults && !string.IsNullOrWhiteSpace(_searchValue))
+            {
+                <button class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size: 0.7rem;" @onclick="ShowSaveSearchDialog">@L["Search_SaveSearch"]</button>
+            }
+        </div>
+    }
+    @if (_showSaveSearch)
+    {
+        <div class="d-flex gap-1 mt-1">
+            <input type="text" class="form-control form-control-sm" @bind="_saveSearchName" placeholder="@L["Search_SearchName"]" />
+            <button class="btn btn-sm btn-primary" @onclick="SaveCurrentSearch" disabled="@string.IsNullOrWhiteSpace(_saveSearchName)">@L["Search_Save"]</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showSaveSearch = false"><i class="bi bi-x-lg"></i></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(Error))
+    {
+        <div class="text-danger small">@Error</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public LdapService LdapService { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public string BaseDn { get; set; } = "";
+
+    [Parameter]
+    public bool HasResults { get; set; }
+
+    [Parameter]
+    public string? Error { get; set; }
+
+    [Parameter]
+    public EventCallback<List<LdapEntry>> OnResults { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnError { get; set; }
+
+    [Parameter]
+    public EventCallback OnClear { get; set; }
+
+    private string _searchAttribute = "";
+    private string _searchValue = "";
+    private bool _searching;
+
+    // Search History
+    private List<SearchHistoryItem> _searchHistory = new();
+    private bool _showSearchHistory;
+
+    // Saved Searches
+    private List<SavedSearch> _savedSearches = new();
+    private bool _showSaveSearch;
+    private string _saveSearchName = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadSearchHistory();
+            await LoadSavedSearches();
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleSearchKey(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await ExecuteSearch();
+    }
+
+    private async Task ExecuteSearch()
+    {
+        if (string.IsNullOrWhiteSpace(_searchValue)) return;
+
+        _searching = true;
+        _showSearchHistory = false;
+        _showSaveSearch = false;
+        StateHasChanged();
+
+        try
+        {
+            var filter = BuildFilter();
+            var results = await LdapService.Search(BaseDn, filter);
+            await AddToSearchHistory(_searchAttribute, _searchValue.Trim());
+            await OnResults.InvokeAsync(results);
+        }
+        catch (Exception ex)
+        {
+            await OnError.InvokeAsync(ex.Message);
+        }
+        finally
+        {
+            _searching = false;
+        }
+    }
+
+    private string BuildFilter()
+    {
+        if (_searchAttribute == "")
+        {
+            var f = _searchValue.Trim();
+            return f.StartsWith("(") ? f : $"({f})";
+        }
+
+        var val = _searchValue.Trim();
+        if (!val.Contains('*')) val = $"*{val}*";
+        return $"({_searchAttribute}={val})";
+    }
+
+    private async Task ClearSearch()
+    {
+        _searchValue = "";
+        _showSaveSearch = false;
+        await OnClear.InvokeAsync();
+    }
+
+    private async Task HideSearchHistoryDelayed()
+    {
+        await Task.Delay(200);
+        _showSearchHistory = false;
+    }
+
+    // Search History
+    private async Task LoadSearchHistory()
+    {
+        try
+        {
+            var json = await JS.InvokeAsync<string>("searchHistoryStorage.load");
+            _searchHistory = JsonSerializer.Deserialize<List<SearchHistoryItem>>(json) ?? new();
+        }
+        catch { _searchHistory = new(); }
+    }
+
+    private async Task SaveSearchHistory()
+    {
+        var json = JsonSerializer.Serialize(_searchHistory);
+        await JS.InvokeVoidAsync("searchHistoryStorage.save", json);
+    }
+
+    private async Task AddToSearchHistory(string attribute, string value)
+    {
+        _searchHistory.RemoveAll(h => h.Attribute == attribute && h.Value == value);
+        _searchHistory.Insert(0, new SearchHistoryItem { Attribute = attribute, Value = value });
+        if (_searchHistory.Count > 20)
+            _searchHistory = _searchHistory.Take(20).ToList();
+        await SaveSearchHistory();
+    }
+
+    private async Task ApplySearchHistory(SearchHistoryItem item)
+    {
+        _searchAttribute = item.Attribute;
+        _searchValue = item.Value;
+        _showSearchHistory = false;
+        await ExecuteSearch();
+    }
+
+    // Saved Searches
+    private async Task LoadSavedSearches()
+    {
+        try
+        {
+            var json = await JS.InvokeAsync<string>("savedSearchStorage.load");
+            _savedSearches = JsonSerializer.Deserialize<List<SavedSearch>>(json) ?? new();
+        }
+        catch { _savedSearches = new(); }
+    }
+
+    private async Task SaveSavedSearches()
+    {
+        var json = JsonSerializer.Serialize(_savedSearches);
+        await JS.InvokeVoidAsync("savedSearchStorage.save", json);
+    }
+
+    private void ShowSaveSearchDialog()
+    {
+        _showSaveSearch = true;
+        _saveSearchName = "";
+    }
+
+    private async Task SaveCurrentSearch()
+    {
+        if (string.IsNullOrWhiteSpace(_saveSearchName)) return;
+
+        _savedSearches.Add(new SavedSearch
+        {
+            Name = _saveSearchName.Trim(),
+            Attribute = _searchAttribute,
+            Value = _searchValue.Trim(),
+            Filter = BuildFilter()
+        });
+
+        await SaveSavedSearches();
+        _showSaveSearch = false;
+        _saveSearchName = "";
+    }
+
+    private async Task RemoveSavedSearch(SavedSearch search)
+    {
+        _savedSearches.Remove(search);
+        await SaveSavedSearches();
+    }
+
+    private async Task ApplySavedSearch(SavedSearch search)
+    {
+        _searchAttribute = search.Attribute;
+        _searchValue = search.Value;
+        await ExecuteSearch();
+    }
+}

@@ -1,4 +1,6 @@
+using System.Text.Json;
 using LdapViewer.Models;
+using Microsoft.JSInterop;
 
 namespace LdapViewer.Services;
 
@@ -62,9 +64,28 @@ public class ConnectionManager : IDisposable
             .ToList();
     }
 
-    public string? GetConnectionName(string id)
+    /// <summary>
+    /// Tries to reconnect from localStorage saved connection. Returns true if successful.
+    /// </summary>
+    public async Task<bool> TryReconnectFromStorage(IJSRuntime js)
     {
-        return _connectionNames.GetValueOrDefault(id);
+        if (IsConnected) return true;
+
+        try
+        {
+            var json = await js.InvokeAsync<string>("connectionStorage.loadLastConnection");
+            if (string.IsNullOrEmpty(json)) return false;
+
+            var settings = JsonSerializer.Deserialize<LdapConnectionSettings>(json);
+            if (settings == null) return false;
+
+            await Task.Run(() => AddConnection(settings));
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public void Dispose()

@@ -1,37 +1,41 @@
 @page "/ldif-import"
-@using LdapViewer.Models
-@using LdapViewer.Services
 @inject ConnectionManager ConnMgr
-@inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject IStringLocalizer<Loc> L
 @rendermode InteractiveServer
 
-<PageTitle>Open LDAP Viewer - LDIF Import</PageTitle>
+<PageTitle>@L["PageTitle_LdifImport"]</PageTitle>
 
-@if (!ConnMgr.IsConnected)
+@if (_reconnecting)
+{
+    <div class="container mt-4 text-center">
+        <span class="spinner-border me-2"></span> @L["Browser_Reconnecting"]
+    </div>
+}
+else if (!ConnMgr.IsConnected)
 {
     <div class="container mt-4">
         <div class="alert alert-warning">
-            Nicht verbunden. <a href="/">Zur Verbindungsseite</a>
+            @L["Browser_NotConnected"] <a href="/">@L["Browser_ToConnectionPage"]</a>
         </div>
     </div>
 }
 else
 {
     <div class="container-fluid mt-3 px-4">
-        <h4 class="mb-3">LDIF Import</h4>
+        <h4 class="mb-3">@L["Ldif_Title"]</h4>
 
         <div class="mb-3">
-            <label class="form-label">LDIF-Inhalt</label>
-            <textarea class="form-control ldif-textarea" rows="12" @bind="_ldifContent" placeholder="dn: cn=Neuer Benutzer,ou=People,dc=example,dc=com
+            <label class="form-label">@L["Ldif_Content"]</label>
+            <textarea class="form-control ldif-textarea" rows="12" @bind="_ldifContent" placeholder="dn: cn=New User,ou=People,dc=example,dc=com
 objectClass: inetOrgPerson
 objectClass: top
-cn: Neuer Benutzer
-sn: Benutzer"></textarea>
+cn: New User
+sn: User"></textarea>
         </div>
 
         <div class="mb-3">
-            <label class="form-label">Oder Datei hochladen</label>
+            <label class="form-label">@L["Ldif_Upload"]</label>
             <InputFile class="form-control form-control-sm" OnChange="HandleFileUpload" accept=".ldif,.ldf" />
         </div>
 
@@ -42,7 +46,7 @@ sn: Benutzer"></textarea>
 
         <div class="d-flex gap-2 mb-3">
             <button class="btn btn-primary" @onclick="ParseLdif" disabled="@(string.IsNullOrWhiteSpace(_ldifContent))">
-                Parsen
+                <i class="bi bi-code-slash me-1"></i>@L["Ldif_Parse"]
             </button>
             @if (_operations != null && _operations.Count > 0 && _results == null)
             {
@@ -51,24 +55,24 @@ sn: Benutzer"></textarea>
                     {
                         <span class="spinner-border spinner-border-sm me-1"></span>
                     }
-                    Ausfuehren (@_operations.Count Operationen)
+                    <i class="bi bi-play-fill me-1"></i>@string.Format(L["Ldif_Execute"], _operations.Count)
                 </button>
             }
             @if (_operations != null || _results != null)
             {
-                <button class="btn btn-outline-secondary" @onclick="Reset">Zuruecksetzen</button>
+                <button class="btn btn-outline-secondary" @onclick="Reset"><i class="bi bi-arrow-counterclockwise me-1"></i>@L["Ldif_Reset"]</button>
             }
         </div>
 
         @if (_operations != null && _operations.Count > 0 && _results == null)
         {
-            <h5>Vorschau</h5>
+            <h5>@L["Ldif_Preview"]</h5>
             <table class="table table-sm">
                 <thead>
                     <tr>
-                        <th>DN</th>
-                        <th style="width: 120px">Operation</th>
-                        <th style="width: 80px">Attribute</th>
+                        <th>@L["Ldif_DN"]</th>
+                        <th style="width: 120px">@L["Ldif_Operation"]</th>
+                        <th style="width: 80px">@L["Ldif_Attributes"]</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -97,14 +101,14 @@ sn: Benutzer"></textarea>
 
         @if (_results != null)
         {
-            <h5>Ergebnisse</h5>
+            <h5>@L["Ldif_Results"]</h5>
             <table class="table table-sm">
                 <thead>
                     <tr>
-                        <th>DN</th>
-                        <th style="width: 120px">Operation</th>
-                        <th style="width: 100px">Status</th>
-                        <th>Fehler</th>
+                        <th>@L["Ldif_DN"]</th>
+                        <th style="width: 120px">@L["Ldif_Operation"]</th>
+                        <th style="width: 100px">@L["Ldif_Status"]</th>
+                        <th>@L["Ldif_Error"]</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -118,11 +122,11 @@ sn: Benutzer"></textarea>
                             <td>
                                 @if (result.Success)
                                 {
-                                    <span class="badge bg-success">Erfolg</span>
+                                    <span class="badge bg-success">@L["Ldif_Success"]</span>
                                 }
                                 else
                                 {
-                                    <span class="badge bg-danger">Fehler</span>
+                                    <span class="badge bg-danger">@L["Ldif_Error"]</span>
                                 }
                             </td>
                             <td class="small text-danger">@result.Error</td>
@@ -132,7 +136,7 @@ sn: Benutzer"></textarea>
             </table>
 
             <div class="small text-muted">
-                @_results.Count(r => r.Success) von @_results.Count erfolgreich
+                @string.Format(L["Ldif_SuccessCount"], _results.Count(r => r.Success), _results.Count)
             </div>
         }
     </div>
@@ -144,6 +148,19 @@ sn: Benutzer"></textarea>
     private List<LdifResult>? _results;
     private string? _error;
     private bool _executing;
+    private bool _reconnecting;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !ConnMgr.IsConnected)
+        {
+            _reconnecting = true;
+            StateHasChanged();
+            await ConnMgr.TryReconnectFromStorage(JS);
+            _reconnecting = false;
+            StateHasChanged();
+        }
+    }
 
     private void ParseLdif()
     {
@@ -155,12 +172,12 @@ sn: Benutzer"></textarea>
             _operations = LdapService.ParseLdif(_ldifContent);
             if (_operations.Count == 0)
             {
-                _error = "Keine gueltige LDIF-Operationen gefunden.";
+                _error = L["Ldif_NoValidOps"];
             }
         }
         catch (Exception ex)
         {
-            _error = $"Parse-Fehler: {ex.Message}";
+            _error = string.Format(L["Ldif_ParseError"], ex.Message);
             _operations = null;
         }
     }
@@ -179,7 +196,7 @@ sn: Benutzer"></textarea>
         }
         catch (Exception ex)
         {
-            _error = $"Fehler: {ex.Message}";
+            _error = string.Format(L["Ldif_GeneralError"], ex.Message);
         }
         finally
         {
@@ -199,7 +216,7 @@ sn: Benutzer"></textarea>
         }
         catch (Exception ex)
         {
-            _error = $"Datei-Fehler: {ex.Message}";
+            _error = string.Format(L["Ldif_FileError"], ex.Message);
         }
     }
 

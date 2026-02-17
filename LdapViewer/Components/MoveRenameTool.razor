@@ -1,0 +1,97 @@
+@inject IStringLocalizer<Loc> L
+
+<div class="tool-panel mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <strong class="small">@L["Move_Title"]</strong>
+        <button class="btn btn-sm btn-outline-secondary py-0 px-1" @onclick="Close"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="mb-2">
+        <label class="form-label small mb-0">@L["Move_NewRdn"]</label>
+        <input type="text" class="form-control form-control-sm" @bind="_newRdn" placeholder="@GetCurrentRdn()" />
+    </div>
+    <div class="mb-2">
+        <label class="form-label small mb-0">@L["Move_NewParent"]</label>
+        <input type="text" class="form-control form-control-sm" @bind="_newParent" placeholder="@GetCurrentParent()" />
+    </div>
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger small py-1 px-2">@_error</div>
+    }
+    <button class="btn btn-sm btn-primary" @onclick="ExecuteMove" disabled="@_moving">
+        @if (_moving)
+        {
+            <span class="spinner-border spinner-border-sm me-1"></span>
+        }
+        @L["Move_Button"]
+    </button>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public LdapEntry Entry { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public LdapService LdapService { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnMoved { get; set; }
+
+    private string _newRdn = "";
+    private string _newParent = "";
+    private string? _error;
+    private bool _moving;
+
+    private string GetCurrentRdn()
+    {
+        var idx = Entry.Dn.IndexOf(',');
+        return idx > 0 ? Entry.Dn[..idx] : Entry.Dn;
+    }
+
+    private string GetCurrentParent()
+    {
+        var idx = Entry.Dn.IndexOf(',');
+        return idx > 0 ? Entry.Dn[(idx + 1)..] : "";
+    }
+
+    private async Task Close()
+    {
+        if (OnClose.HasDelegate)
+            await OnClose.InvokeAsync();
+    }
+
+    private async Task ExecuteMove()
+    {
+        _error = null;
+        var newRdn = string.IsNullOrWhiteSpace(_newRdn) ? GetCurrentRdn() : _newRdn.Trim();
+        var newParent = string.IsNullOrWhiteSpace(_newParent) ? null : _newParent.Trim();
+
+        if (newRdn == GetCurrentRdn() && newParent == null)
+        {
+            _error = L["Move_NoChange"];
+            return;
+        }
+
+        _moving = true;
+        StateHasChanged();
+
+        try
+        {
+            await LdapService.MoveEntry(Entry.Dn, newRdn, newParent);
+            var newDn = newParent != null ? $"{newRdn},{newParent}" : $"{newRdn},{GetCurrentParent()}";
+
+            if (OnMoved.HasDelegate)
+                await OnMoved.InvokeAsync(newDn);
+        }
+        catch (Exception ex)
+        {
+            _error = string.Format(L["Move_Error"], ex.Message);
+        }
+        finally
+        {
+            _moving = false;
+        }
+    }
+}

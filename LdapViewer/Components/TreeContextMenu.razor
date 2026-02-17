@@ -1,0 +1,41 @@
+@inject IStringLocalizer<Loc> L
+
+@if (MenuArgs != null)
+{
+    <div class="context-menu-overlay" @onclick="Close">
+        <div class="context-menu" style="left: @(MenuArgs.ClientX)px; top: @(MenuArgs.ClientY)px;" @onclick:stopPropagation="true">
+            <div class="context-menu-header">@MenuArgs.DisplayName</div>
+            <div class="context-menu-item" @onclick="NewChild"><i class="bi bi-plus-circle"></i> @L["Context_NewChild"]</div>
+            <div class="context-menu-item" @onclick="Copy"><i class="bi bi-copy"></i> @L["Context_Copy"]</div>
+            <div class="context-menu-item" @onclick="CopyDn"><i class="bi bi-clipboard"></i> @L["Context_CopyDn"]</div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item context-menu-danger" @onclick="Delete"><i class="bi bi-trash3"></i> @L["Context_Delete"]</div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public TreeContextMenuArgs? MenuArgs { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback OnNewChild { get; set; }
+
+    [Parameter]
+    public EventCallback OnCopy { get; set; }
+
+    [Parameter]
+    public EventCallback OnCopyDn { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    private async Task Close() => await OnClose.InvokeAsync();
+    private async Task NewChild() => await OnNewChild.InvokeAsync();
+    private async Task Copy() => await OnCopy.InvokeAsync();
+    private async Task CopyDn() => await OnCopyDn.InvokeAsync();
+    private async Task Delete() => await OnDelete.InvokeAsync();
+}

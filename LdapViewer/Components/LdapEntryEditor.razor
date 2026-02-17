@@ -1,32 +1,31 @@
-@using LdapViewer.Models
-@using LdapViewer.Services
+@inject IStringLocalizer<Loc> L
 
 <div class="entry-editor p-3">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0">Neuer Eintrag</h5>
-        <button class="btn btn-sm btn-outline-secondary" @onclick="Cancel">Abbrechen</button>
+        <h5 class="mb-0">@L["Editor_NewEntry"]</h5>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Cancel"><i class="bi bi-x-lg me-1"></i>@L["Editor_Cancel"]</button>
     </div>
 
     @* Templates *@
     <div class="mb-3">
-        <label class="form-label small fw-bold">Vorlage</label>
+        <label class="form-label small fw-bold">@L["Editor_Template"]</label>
         <div class="d-flex flex-wrap gap-1">
-            <button class="btn btn-sm @(_activeTemplate == "person" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("person")'>Person</button>
-            <button class="btn btn-sm @(_activeTemplate == "group" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("group")'>Gruppe</button>
-            <button class="btn btn-sm @(_activeTemplate == "ou" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("ou")'>Org.-Einheit</button>
-            <button class="btn btn-sm @(_activeTemplate == "posixUser" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("posixUser")'>POSIX-User</button>
-            <button class="btn btn-sm @(_activeTemplate == "posixGroup" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("posixGroup")'>POSIX-Gruppe</button>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearTemplate">Leer</button>
+            <button class="btn btn-sm @(_activeTemplate == "person" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("person")'>@L["Editor_Person"]</button>
+            <button class="btn btn-sm @(_activeTemplate == "group" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("group")'>@L["Editor_Group"]</button>
+            <button class="btn btn-sm @(_activeTemplate == "ou" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("ou")'>@L["Editor_OrgUnit"]</button>
+            <button class="btn btn-sm @(_activeTemplate == "posixUser" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("posixUser")'>@L["Editor_PosixUser"]</button>
+            <button class="btn btn-sm @(_activeTemplate == "posixGroup" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("posixGroup")'>@L["Editor_PosixGroup"]</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearTemplate">@L["Editor_Empty"]</button>
         </div>
     </div>
 
     @* RDN *@
     <div class="mb-3">
         <label class="form-label small fw-bold">
-            RDN
+            @L["Editor_Rdn"]
             @if (!string.IsNullOrEmpty(_rdnHint))
             {
-                <span class="text-muted fw-normal"> (z.B. @_rdnHint)</span>
+                <span class="text-muted fw-normal"> @string.Format(L["Editor_RdnExample"], _rdnHint)</span>
             }
         </label>
         <input type="text" class="form-control form-control-sm" @bind="_rdn" placeholder="@(_rdnHint ?? "cn=NeuerEintrag")" />
@@ -34,9 +33,9 @@
 
     @* Parent DN *@
     <div class="mb-3">
-        <label class="form-label small fw-bold">Parent DN</label>
+        <label class="form-label small fw-bold">@L["Editor_ParentDn"]</label>
         <input type="text" class="form-control form-control-sm" @bind="_parentDn" />
-        <div class="form-text small">Vollstaendiger DN: <code>@FullDnPreview</code></div>
+        <div class="form-text small">@L["Editor_FullDn"] <code>@FullDnPreview</code></div>
     </div>
 
     @* objectClasses *@
@@ -54,7 +53,7 @@
                 </div>
                 @if (_objectClasses.Count > 1)
                 {
-                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveObjectClass(idx)">X</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveObjectClass(idx)"><i class="bi bi-x"></i></button>
                 }
             </div>
         }
@@ -65,12 +64,12 @@
     @if (_requiredAttributes.Count > 0)
     {
         <div class="mb-3">
-            <label class="form-label small fw-bold">Pflichtattribute <span class="text-danger">*</span></label>
+            <label class="form-label small fw-bold">@L["Editor_Required"] <span class="text-danger">*</span></label>
             @foreach (var attr in _requiredAttributes)
             {
                 var attrName = attr;
                 <div class="d-flex gap-1 mb-1 align-items-center">
-                    <span class="editor-attr-label editor-attr-required" title="Pflichtattribut">@attrName</span>
+                    <span class="editor-attr-label editor-attr-required" title="@L["Editor_RequiredAttr"]">@attrName</span>
                     <input type="text" class="form-control form-control-sm"
                            value="@GetAttrValue(attrName)"
                            @onchange="(e) => SetAttrValue(attrName, e.Value?.ToString() ?? string.Empty)"
@@ -82,7 +81,7 @@
 
     @* Additional attributes *@
     <div class="mb-3">
-        <label class="form-label small fw-bold">Weitere Attribute</label>
+        <label class="form-label small fw-bold">@L["Editor_Additional"]</label>
         @for (int i = 0; i < _extraAttributes.Count; i++)
         {
             var idx = i;
@@ -91,16 +90,16 @@
                     <AttributeAutocomplete Value="@_extraAttributes[idx].Name"
                                            ValueChanged="(v) => _extraAttributes[idx] = (_extraAttributes[idx] with { Name = v })"
                                            ExtraSuggestions="@(_allowedAttributeNames)"
-                                           Placeholder="Attribut" />
+                                           Placeholder="@L["Autocomplete_Placeholder"]" />
                 </div>
                 <input type="text" class="form-control form-control-sm"
                        value="@_extraAttributes[idx].Value"
                        @onchange="(e) => _extraAttributes[idx] = (_extraAttributes[idx] with { Value = e.Value?.ToString() ?? string.Empty })"
-                       placeholder="Wert" />
-                <button class="btn btn-sm btn-outline-danger" @onclick="() => _extraAttributes.RemoveAt(idx)">X</button>
+                       placeholder="@L["Detail_Value"]" />
+                <button class="btn btn-sm btn-outline-danger" @onclick="() => _extraAttributes.RemoveAt(idx)"><i class="bi bi-x"></i></button>
             </div>
         }
-        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _extraAttributes.Add(new AttrPair(string.Empty, string.Empty))">+ Attribut</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _extraAttributes.Add(new AttrPair(string.Empty, string.Empty))">@L["Editor_AddAttribute"]</button>
     </div>
 
     @* Validation warnings *@
@@ -132,9 +131,9 @@
             {
                 <span class="spinner-border spinner-border-sm me-1"></span>
             }
-            Erstellen
+            <i class="bi bi-check-lg me-1"></i>@L["Editor_Create"]
         </button>
-        <button class="btn btn-outline-secondary" @onclick="Cancel">Abbrechen</button>
+        <button class="btn btn-outline-secondary" @onclick="Cancel"><i class="bi bi-x-lg me-1"></i>@L["Editor_Cancel"]</button>
     </div>
 </div>
 
@@ -174,7 +173,7 @@
 
     private string FullDnPreview =>
         string.IsNullOrWhiteSpace(_rdn) && string.IsNullOrWhiteSpace(_parentDn)
-            ? "(leer)"
+            ? L["Editor_EmptyPreview"]
             : string.IsNullOrWhiteSpace(_rdn)
                 ? _parentDn
                 : string.IsNullOrWhiteSpace(_parentDn)
@@ -249,7 +248,6 @@
         RefreshSchemaInfo();
 
         // Move required attrs from extra to required values
-        var toRemove = new List<int>();
         for (int i = _extraAttributes.Count - 1; i >= 0; i--)
         {
             if (_requiredAttributes.Contains(_extraAttributes[i].Name))
@@ -398,11 +396,11 @@
         var warnings = new List<string>();
 
         if (string.IsNullOrWhiteSpace(_rdn))
-            warnings.Add("RDN ist leer.");
+            warnings.Add(L["Editor_RdnEmpty"]);
 
         var classes = _objectClasses.Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
         if (classes.Count == 0)
-            warnings.Add("Mindestens eine objectClass ist erforderlich.");
+            warnings.Add(L["Editor_ObjectClassRequired"]);
 
         // Check required attributes have values
         foreach (var req in _requiredAttributes)
@@ -412,7 +410,7 @@
                 // Check if it's in extra attributes
                 var extra = _extraAttributes.FirstOrDefault(a => a.Name.Equals(req, StringComparison.OrdinalIgnoreCase));
                 if (string.IsNullOrWhiteSpace(extra.Value))
-                    warnings.Add($"Pflichtattribut '{req}' hat keinen Wert.");
+                    warnings.Add(string.Format(L["Editor_RequiredNoValue"], req));
             }
         }
 
@@ -429,12 +427,12 @@
         var classes = _objectClasses.Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
         if (string.IsNullOrWhiteSpace(_rdn))
         {
-            _error = "RDN muss ausgefuellt sein.";
+            _error = L["Editor_RdnRequired"];
             return;
         }
         if (classes.Count == 0)
         {
-            _error = "Mindestens eine objectClass ist erforderlich.";
+            _error = L["Editor_ObjectClassRequired"];
             return;
         }
 
@@ -472,13 +470,13 @@
 
             await LdapService.CreateEntry(dn, attrs);
 
-            _success = $"Eintrag '{dn}' erstellt.";
+            _success = string.Format(L["Editor_Created"], dn);
             if (OnCreated.HasDelegate)
                 await OnCreated.InvokeAsync(dn);
         }
         catch (Exception ex)
         {
-            _error = $"Fehler beim Erstellen: {ex.Message}";
+            _error = string.Format(L["Editor_CreateError"], ex.Message);
         }
         finally
         {
