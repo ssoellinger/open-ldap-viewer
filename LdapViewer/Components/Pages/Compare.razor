@@ -1,0 +1,158 @@
+@page "/compare"
+@using System.Text.Json
+@using LdapViewer.Models
+@using LdapViewer.Services
+@inject ConnectionManager ConnMgr
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Open LDAP Viewer - Vergleich</PageTitle>
+
+@if (!ConnMgr.IsConnected)
+{
+    <div class="container mt-4">
+        <div class="alert alert-warning">
+            Nicht verbunden. <a href="/">Zur Verbindungsseite</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="container-fluid mt-3 px-4">
+        <h4 class="mb-3">Eintraege vergleichen</h4>
+
+        <div class="row mb-3">
+            <div class="col-md-5">
+                <label class="form-label">DN 1</label>
+                <input type="text" class="form-control form-control-sm" @bind="_dn1" placeholder="cn=user1,ou=People,dc=example,dc=com" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">DN 2</label>
+                <input type="text" class="form-control form-control-sm" @bind="_dn2" placeholder="cn=user2,ou=People,dc=example,dc=com" />
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100" @onclick="DoCompare" disabled="@_loading">
+                    @if (_loading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Vergleichen
+                </button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        @if (_entry1 != null && _entry2 != null)
+        {
+            <table class="table table-sm compare-table">
+                <thead>
+                    <tr>
+                        <th style="width: 20%">Attribut</th>
+                        <th style="width: 40%">@_entry1.Dn</th>
+                        <th style="width: 40%">@_entry2.Dn</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var attrName in _allAttributes)
+                    {
+                        var has1 = _entry1.Attributes.TryGetValue(attrName, out var vals1);
+                        var has2 = _entry2.Attributes.TryGetValue(attrName, out var vals2);
+                        var v1 = has1 ? vals1! : new List<string>();
+                        var v2 = has2 ? vals2! : new List<string>();
+                        var rowClass = GetCompareRowClass(has1, has2, v1, v2);
+
+                        <tr class="@rowClass">
+                            <td class="attr-name">@attrName</td>
+                            <td class="attr-value compare-cell">
+                                @foreach (var val in v1)
+                                {
+                                    <div>@val</div>
+                                }
+                            </td>
+                            <td class="attr-value compare-cell">
+                                @foreach (var val in v2)
+                                {
+                                    <div>@val</div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <div class="d-flex gap-3 small text-muted mb-3">
+                <span><span class="compare-legend compare-legend-only"></span> Nur in einem Eintrag</span>
+                <span><span class="compare-legend compare-legend-diff"></span> Unterschiedliche Werte</span>
+                <span><span class="compare-legend compare-legend-same"></span> Identisch</span>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private string _dn1 = "";
+    private string _dn2 = "";
+    private LdapEntry? _entry1;
+    private LdapEntry? _entry2;
+    private List<string> _allAttributes = new();
+    private bool _loading;
+    private string? _error;
+
+    private async Task DoCompare()
+    {
+        if (string.IsNullOrWhiteSpace(_dn1) || string.IsNullOrWhiteSpace(_dn2))
+        {
+            _error = "Beide DNs muessen ausgefuellt sein.";
+            return;
+        }
+
+        _loading = true;
+        _error = null;
+        _entry1 = null;
+        _entry2 = null;
+        StateHasChanged();
+
+        try
+        {
+            _entry1 = await ConnMgr.Active!.GetEntry(_dn1.Trim());
+            _entry2 = await ConnMgr.Active!.GetEntry(_dn2.Trim());
+
+            if (_entry1 == null)
+            {
+                _error = $"Eintrag nicht gefunden: {_dn1}";
+                return;
+            }
+            if (_entry2 == null)
+            {
+                _error = $"Eintrag nicht gefunden: {_dn2}";
+                return;
+            }
+
+            _allAttributes = _entry1.Attributes.Keys
+                .Union(_entry2.Attributes.Keys)
+                .OrderBy(a => a, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Fehler: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string GetCompareRowClass(bool has1, bool has2, List<string> v1, List<string> v2)
+    {
+        if (has1 && !has2) return "compare-only-left";
+        if (!has1 && has2) return "compare-only-right";
+        if (has1 && has2 && !v1.SequenceEqual(v2)) return "compare-diff";
+        return "";
+    }
+}

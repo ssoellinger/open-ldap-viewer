@@ -2,7 +2,7 @@
 @using System.Text.Json
 @using LdapViewer.Models
 @using LdapViewer.Services
-@inject LdapService LdapService
+@inject ConnectionManager ConnMgr
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @rendermode InteractiveServer
@@ -117,7 +117,7 @@
                 </div>
             </div>
 
-            @if (LdapService.IsConnected)
+            @if (ConnMgr.IsConnected)
             {
                 <div class="card mt-3">
                     <div class="card-header">
@@ -296,7 +296,7 @@
 
         try
         {
-            await Task.Run(() => LdapService.Connect(_settings));
+            await Task.Run(() => ConnMgr.AddConnection(_settings));
             await SaveConnection();
             await JS.InvokeVoidAsync("connectionStorage.saveLastConnection",
                 JsonSerializer.Serialize(_settings));
@@ -327,7 +327,7 @@
 
         try
         {
-            await Task.Run(() => LdapService.TestBind(_testUserDn, _testUserPassword));
+            await Task.Run(() => ConnMgr.Active!.TestBind(_testUserDn, _testUserPassword));
             _testBindSuccess = true;
         }
         catch (Exception ex)

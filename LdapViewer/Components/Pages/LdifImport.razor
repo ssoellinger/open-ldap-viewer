@@ -1,0 +1,220 @@
+@page "/ldif-import"
+@using LdapViewer.Models
+@using LdapViewer.Services
+@inject ConnectionManager ConnMgr
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Open LDAP Viewer - LDIF Import</PageTitle>
+
+@if (!ConnMgr.IsConnected)
+{
+    <div class="container mt-4">
+        <div class="alert alert-warning">
+            Nicht verbunden. <a href="/">Zur Verbindungsseite</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="container-fluid mt-3 px-4">
+        <h4 class="mb-3">LDIF Import</h4>
+
+        <div class="mb-3">
+            <label class="form-label">LDIF-Inhalt</label>
+            <textarea class="form-control ldif-textarea" rows="12" @bind="_ldifContent" placeholder="dn: cn=Neuer Benutzer,ou=People,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: top
+cn: Neuer Benutzer
+sn: Benutzer"></textarea>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Oder Datei hochladen</label>
+            <InputFile class="form-control form-control-sm" OnChange="HandleFileUpload" accept=".ldif,.ldf" />
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        <div class="d-flex gap-2 mb-3">
+            <button class="btn btn-primary" @onclick="ParseLdif" disabled="@(string.IsNullOrWhiteSpace(_ldifContent))">
+                Parsen
+            </button>
+            @if (_operations != null && _operations.Count > 0 && _results == null)
+            {
+                <button class="btn btn-success" @onclick="ExecuteLdif" disabled="@_executing">
+                    @if (_executing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Ausfuehren (@_operations.Count Operationen)
+                </button>
+            }
+            @if (_operations != null || _results != null)
+            {
+                <button class="btn btn-outline-secondary" @onclick="Reset">Zuruecksetzen</button>
+            }
+        </div>
+
+        @if (_operations != null && _operations.Count > 0 && _results == null)
+        {
+            <h5>Vorschau</h5>
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>DN</th>
+                        <th style="width: 120px">Operation</th>
+                        <th style="width: 80px">Attribute</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var op in _operations)
+                    {
+                        <tr>
+                            <td class="font-monospace small">@op.Dn</td>
+                            <td>
+                                <span class="badge @GetOperationBadgeClass(op.ChangeType)">@op.ChangeType</span>
+                            </td>
+                            <td>
+                                @if (op.ChangeType == LdifChangeType.Add)
+                                {
+                                    @op.Attributes.Count
+                                }
+                                else if (op.ChangeType == LdifChangeType.Modify)
+                                {
+                                    @op.Modifications.Count
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        @if (_results != null)
+        {
+            <h5>Ergebnisse</h5>
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>DN</th>
+                        <th style="width: 120px">Operation</th>
+                        <th style="width: 100px">Status</th>
+                        <th>Fehler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var result in _results)
+                    {
+                        <tr class="@(result.Success ? "" : "table-danger")">
+                            <td class="font-monospace small">@result.Dn</td>
+                            <td>
+                                <span class="badge @GetOperationBadgeClass(result.ChangeType)">@result.ChangeType</span>
+                            </td>
+                            <td>
+                                @if (result.Success)
+                                {
+                                    <span class="badge bg-success">Erfolg</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger">Fehler</span>
+                                }
+                            </td>
+                            <td class="small text-danger">@result.Error</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <div class="small text-muted">
+                @_results.Count(r => r.Success) von @_results.Count erfolgreich
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private string _ldifContent = "";
+    private List<LdifOperation>? _operations;
+    private List<LdifResult>? _results;
+    private string? _error;
+    private bool _executing;
+
+    private void ParseLdif()
+    {
+        _error = null;
+        _results = null;
+
+        try
+        {
+            _operations = LdapService.ParseLdif(_ldifContent);
+            if (_operations.Count == 0)
+            {
+                _error = "Keine gueltige LDIF-Operationen gefunden.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Parse-Fehler: {ex.Message}";
+            _operations = null;
+        }
+    }
+
+    private async Task ExecuteLdif()
+    {
+        if (_operations == null || _operations.Count == 0) return;
+
+        _executing = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            _results = await ConnMgr.Active!.ApplyLdif(_operations);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Fehler: {ex.Message}";
+        }
+        finally
+        {
+            _executing = false;
+        }
+    }
+
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            using var reader = new System.IO.StreamReader(e.File.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024));
+            _ldifContent = await reader.ReadToEndAsync();
+            _operations = null;
+            _results = null;
+            _error = null;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Datei-Fehler: {ex.Message}";
+        }
+    }
+
+    private void Reset()
+    {
+        _operations = null;
+        _results = null;
+        _error = null;
+    }
+
+    private static string GetOperationBadgeClass(LdifChangeType type) => type switch
+    {
+        LdifChangeType.Add => "bg-success",
+        LdifChangeType.Modify => "bg-warning text-dark",
+        LdifChangeType.Delete => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

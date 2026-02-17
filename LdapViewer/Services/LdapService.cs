@@ -433,6 +433,249 @@ public class LdapService : IDisposable
         }
     }
 
+    public async Task ModifyEntry(string dn, List<LdapModification> modifications)
+    {
+        if (_connection == null)
+            throw new InvalidOperationException("Nicht verbunden");
+
+        await _lock.WaitAsync();
+        try
+        {
+            await Task.Run(() =>
+            {
+                var request = new ModifyRequest(dn);
+
+                foreach (var mod in modifications)
+                {
+                    var dirMod = new DirectoryAttributeModification
+                    {
+                        Name = mod.AttributeName,
+                        Operation = mod.Type switch
+                        {
+                            LdapModificationType.Add => DirectoryAttributeOperation.Add,
+                            LdapModificationType.Delete => DirectoryAttributeOperation.Delete,
+                            LdapModificationType.Replace => DirectoryAttributeOperation.Replace,
+                            _ => DirectoryAttributeOperation.Replace
+                        }
+                    };
+
+                    if (mod.Type == LdapModificationType.Delete && mod.OldValue != null)
+                    {
+                        dirMod.Add(mod.OldValue);
+                    }
+                    else if (mod.NewValue != null)
+                    {
+                        dirMod.Add(mod.NewValue);
+                    }
+
+                    request.Modifications.Add(dirMod);
+                }
+
+                _connection.SendRequest(request);
+            });
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task CreateEntry(string dn, Dictionary<string, List<string>> attributes)
+    {
+        if (_connection == null)
+            throw new InvalidOperationException("Nicht verbunden");
+
+        await _lock.WaitAsync();
+        try
+        {
+            await Task.Run(() =>
+            {
+                var request = new AddRequest(dn);
+
+                foreach (var attr in attributes)
+                {
+                    var dirAttr = new DirectoryAttribute(attr.Key, attr.Value.ToArray());
+                    request.Attributes.Add(dirAttr);
+                }
+
+                _connection.SendRequest(request);
+            });
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task DeleteEntry(string dn)
+    {
+        if (_connection == null)
+            throw new InvalidOperationException("Nicht verbunden");
+
+        await _lock.WaitAsync();
+        try
+        {
+            await Task.Run(() =>
+            {
+                var request = new DeleteRequest(dn);
+                _connection.SendRequest(request);
+            });
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public static List<LdifOperation> ParseLdif(string ldifContent)
+    {
+        var operations = new List<LdifOperation>();
+        var blocks = ldifContent.Split("\n\n", StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var block in blocks)
+        {
+            var lines = block.Split('\n')
+                .Select(l => l.TrimEnd('\r'))
+                .Where(l => !string.IsNullOrWhiteSpace(l) && !l.StartsWith('#'))
+                .ToList();
+
+            if (lines.Count == 0) continue;
+
+            var op = new LdifOperation();
+            string? currentDn = null;
+            LdifChangeType? changeType = null;
+            string? currentModAttr = null;
+            LdapModificationType? currentModType = null;
+
+            foreach (var line in lines)
+            {
+                var colonIdx = line.IndexOf(':');
+                if (colonIdx < 0) continue;
+
+                var key = line[..colonIdx].Trim();
+                var value = line[(colonIdx + 1)..].TrimStart();
+
+                // Handle base64 encoded values (key:: value)
+                if (value.StartsWith(":"))
+                {
+                    value = value[1..].TrimStart();
+                    try
+                    {
+                        value = Encoding.UTF8.GetString(Convert.FromBase64String(value));
+                    }
+                    catch { /* use raw value */ }
+                }
+
+                if (key.Equals("dn", StringComparison.OrdinalIgnoreCase))
+                {
+                    currentDn = value;
+                    op.Dn = value;
+                }
+                else if (key.Equals("changetype", StringComparison.OrdinalIgnoreCase))
+                {
+                    changeType = value.ToLowerInvariant() switch
+                    {
+                        "add" => LdifChangeType.Add,
+                        "modify" => LdifChangeType.Modify,
+                        "delete" => LdifChangeType.Delete,
+                        _ => LdifChangeType.Add
+                    };
+                    op.ChangeType = changeType.Value;
+                }
+                else if (key.Equals("add", StringComparison.OrdinalIgnoreCase) && changeType == LdifChangeType.Modify)
+                {
+                    currentModAttr = value;
+                    currentModType = LdapModificationType.Add;
+                }
+                else if (key.Equals("replace", StringComparison.OrdinalIgnoreCase) && changeType == LdifChangeType.Modify)
+                {
+                    currentModAttr = value;
+                    currentModType = LdapModificationType.Replace;
+                }
+                else if (key.Equals("delete", StringComparison.OrdinalIgnoreCase) && changeType == LdifChangeType.Modify)
+                {
+                    currentModAttr = value;
+                    currentModType = LdapModificationType.Delete;
+                }
+                else if (line.Trim() == "-")
+                {
+                    currentModAttr = null;
+                    currentModType = null;
+                }
+                else if (currentModAttr != null && currentModType != null && key.Equals(currentModAttr, StringComparison.OrdinalIgnoreCase))
+                {
+                    op.Modifications.Add(new LdapModification
+                    {
+                        AttributeName = currentModAttr,
+                        NewValue = currentModType != LdapModificationType.Delete ? value : null,
+                        OldValue = currentModType == LdapModificationType.Delete ? value : null,
+                        Type = currentModType.Value
+                    });
+                }
+                else if (!key.Equals("dn", StringComparison.OrdinalIgnoreCase) &&
+                         !key.Equals("changetype", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Regular attribute for add operations
+                    if (!op.Attributes.ContainsKey(key))
+                        op.Attributes[key] = new List<string>();
+                    op.Attributes[key].Add(value);
+                }
+            }
+
+            if (currentDn == null) continue;
+
+            // If no changetype specified, treat as add
+            if (changeType == null)
+            {
+                op.ChangeType = LdifChangeType.Add;
+            }
+
+            operations.Add(op);
+        }
+
+        return operations;
+    }
+
+    public async Task<List<LdifResult>> ApplyLdif(List<LdifOperation> operations)
+    {
+        var results = new List<LdifResult>();
+
+        foreach (var op in operations)
+        {
+            var result = new LdifResult
+            {
+                Dn = op.Dn,
+                ChangeType = op.ChangeType
+            };
+
+            try
+            {
+                switch (op.ChangeType)
+                {
+                    case LdifChangeType.Add:
+                        await CreateEntry(op.Dn, op.Attributes);
+                        break;
+                    case LdifChangeType.Modify:
+                        await ModifyEntry(op.Dn, op.Modifications);
+                        break;
+                    case LdifChangeType.Delete:
+                        await DeleteEntry(op.Dn);
+                        break;
+                }
+                result.Success = true;
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.Error = ex.Message;
+            }
+
+            results.Add(result);
+        }
+
+        return results;
+    }
+
     public static string ToLdif(LdapEntry entry)
     {
         var sb = new StringBuilder();

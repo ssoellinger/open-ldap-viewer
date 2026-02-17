@@ -644,3 +644,316 @@
 [data-theme="dark"] .form-check-label {
     color: #e0e0e0;
 }
+
+/* ==================== CONNECTION TABS ==================== */
+.connection-tabs {
+    display: flex;
+    background: #e9ecef;
+    border-bottom: 1px solid #dee2e6;
+    padding: 0.3rem 0.5rem 0;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.connection-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid #dee2e6;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    background: #f8f9fa;
+    cursor: pointer;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.connection-tab:hover {
+    background: #fff;
+}
+
+.connection-tab.active {
+    background: #fff;
+    border-bottom: 1px solid #fff;
+    margin-bottom: -1px;
+    font-weight: 600;
+}
+
+.connection-tab-label {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.connection-tab-close {
+    background: none;
+    border: none;
+    color: #6c757d;
+    font-size: 0.75rem;
+    cursor: pointer;
+    padding: 0 0.2rem;
+    line-height: 1;
+}
+
+.connection-tab-close:hover {
+    color: #dc3545;
+}
+
+.connection-tab-add {
+    font-weight: bold;
+    font-size: 1rem;
+    color: #6c757d;
+    padding: 0.3rem 0.6rem;
+}
+
+.connection-tab-add:hover {
+    color: #0d6efd;
+}
+
+/* ==================== EDIT MODE ==================== */
+.edit-table .edit-value-row {
+    display: flex;
+    gap: 0.3rem;
+    margin-bottom: 0.25rem;
+    align-items: center;
+}
+
+.edit-input {
+    flex: 1;
+}
+
+.edit-remove-btn {
+    flex-shrink: 0;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.75rem;
+}
+
+.edit-add-value-btn {
+    font-size: 0.75rem;
+    padding: 0.1rem 0.5rem;
+    margin-top: 0.2rem;
+}
+
+.edit-new-attribute {
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+    background: #f0f8ff;
+    border: 1px dashed #b8daff;
+    border-radius: 4px;
+}
+
+/* ==================== COMPARE PAGE ==================== */
+.compare-table {
+    table-layout: fixed;
+}
+
+.compare-cell {
+    font-size: 0.8rem;
+    word-break: break-all;
+}
+
+.compare-table > tbody > tr.compare-only-left > td,
+.compare-table > tbody > tr.compare-only-right > td {
+    background-color: #d4edda !important;
+    color: #155724;
+}
+
+.compare-table > tbody > tr.compare-diff > td {
+    background-color: #fff3cd !important;
+    color: #856404;
+}
+
+.compare-legend {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    vertical-align: middle;
+    margin-right: 0.3rem;
+}
+
+.compare-legend-only {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+}
+
+.compare-legend-diff {
+    background-color: #fff3cd;
+    border: 1px solid #ffeeba;
+}
+
+.compare-legend-same {
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+}
+
+/* ==================== LDIF IMPORT ==================== */
+.ldif-textarea {
+    font-family: monospace;
+    font-size: 0.85rem;
+    resize: vertical;
+}
+
+/* ==================== ATTRIBUTE AUTOCOMPLETE ==================== */
+.attr-autocomplete {
+    position: relative;
+}
+
+.attr-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 220px;
+    overflow-y: auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+}
+
+.attr-suggestion-item {
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-family: monospace;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.attr-suggestion-item:hover,
+.attr-suggestion-item.selected {
+    background: #e2e6ea;
+}
+
+.attr-suggestion-item strong {
+    color: #0d6efd;
+}
+
+/* ==================== ENTRY EDITOR ==================== */
+.entry-editor {
+    border-bottom: 2px solid #dee2e6;
+}
+
+.editor-attr-label {
+    display: inline-block;
+    width: 40%;
+    min-width: 120px;
+    font-family: monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.editor-attr-required {
+    background-color: #fff3cd;
+    border: 1px solid #ffc107;
+    color: #856404;
+}
+
+/* ==================== DARK MODE - New Features ==================== */
+
+/* Dark Mode - Connection Tabs */
+[data-theme="dark"] .connection-tabs {
+    background: #0f3460;
+    border-color: #0f3460;
+}
+
+[data-theme="dark"] .connection-tab {
+    background: #16213e;
+    border-color: #0f3460;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .connection-tab:hover {
+    background: #1a2744;
+}
+
+[data-theme="dark"] .connection-tab.active {
+    background: #1a1a2e;
+    border-bottom-color: #1a1a2e;
+}
+
+[data-theme="dark"] .connection-tab-close:hover {
+    color: #ff6b6b;
+}
+
+[data-theme="dark"] .connection-tab-add:hover {
+    color: #3a86ff;
+}
+
+/* Dark Mode - Edit Mode */
+[data-theme="dark"] .edit-new-attribute {
+    background: #1a2744;
+    border-color: #0f3460;
+}
+
+/* Dark Mode - Compare */
+[data-theme="dark"] .compare-table > tbody > tr.compare-only-left > td,
+[data-theme="dark"] .compare-table > tbody > tr.compare-only-right > td {
+    background-color: #1a3d1a !important;
+    color: #6bff6b;
+}
+
+[data-theme="dark"] .compare-table > tbody > tr.compare-diff > td {
+    background-color: #3d3a00 !important;
+    color: #ffc107;
+}
+
+[data-theme="dark"] .compare-legend-only {
+    background-color: #1a3d1a;
+    border-color: #2a5d2a;
+}
+
+[data-theme="dark"] .compare-legend-diff {
+    background-color: #3d3a00;
+    border-color: #5d5a00;
+}
+
+[data-theme="dark"] .compare-legend-same {
+    background-color: #16213e;
+    border-color: #0f3460;
+}
+
+/* Dark Mode - LDIF */
+[data-theme="dark"] .ldif-textarea {
+    background-color: #0d1b3e;
+    border-color: #0f3460;
+    color: #e0e0e0;
+}
+
+/* Dark Mode - Attribute Autocomplete */
+[data-theme="dark"] .attr-suggestions {
+    background: #16213e;
+    border-color: #0f3460;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .attr-suggestion-item {
+    border-color: #0f3460;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .attr-suggestion-item:hover,
+[data-theme="dark"] .attr-suggestion-item.selected {
+    background: #1a3060;
+}
+
+[data-theme="dark"] .attr-suggestion-item strong {
+    color: #3a86ff;
+}
+
+/* Dark Mode - Entry Editor */
+[data-theme="dark"] .entry-editor {
+    border-color: #0f3460;
+}
+
+[data-theme="dark"] .editor-attr-required {
+    background-color: #332d00;
+    border-color: #665a00;
+    color: #ffc107;
+}

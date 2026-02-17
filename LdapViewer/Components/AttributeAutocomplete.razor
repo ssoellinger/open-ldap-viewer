@@ -1,0 +1,153 @@
+@using LdapViewer.Models
+
+<div class="attr-autocomplete">
+    <input type="text" class="form-control form-control-sm"
+           value="@Value"
+           placeholder="@Placeholder"
+           @oninput="OnInput"
+           @onfocus="OnFocus"
+           @onblur="OnBlur"
+           @onkeydown="OnKeyDown" />
+    @if (_showSuggestions && _filtered.Length > 0)
+    {
+        <div class="attr-suggestions">
+            @for (int i = 0; i < _filtered.Length && i < 12; i++)
+            {
+                var suggestion = _filtered[i];
+                var isSelected = i == _selectedIndex;
+                <div class="attr-suggestion-item @(isSelected ? "selected" : "")"
+                     @onmousedown="() => SelectSuggestion(suggestion)">
+                    @HighlightMatch(suggestion)
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Value { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter]
+    public string Placeholder { get; set; } = "Attribut-Name";
+
+    [Parameter]
+    public string[]? ExtraSuggestions { get; set; }
+
+    private bool _showSuggestions;
+    private string[] _filtered = [];
+    private int _selectedIndex = -1;
+    private string _currentInput = "";
+
+    private string[] GetAllSuggestions()
+    {
+        if (ExtraSuggestions == null || ExtraSuggestions.Length == 0)
+            return LdapAttributeSuggestions.Common;
+
+        return ExtraSuggestions
+            .Union(LdapAttributeSuggestions.Common)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(a => a, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private void UpdateFilter(string input)
+    {
+        _currentInput = input;
+        var all = GetAllSuggestions();
+
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            _filtered = all.Take(12).ToArray();
+        }
+        else
+        {
+            _filtered = all
+                .Where(a => a.Contains(input, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(a => !a.StartsWith(input, StringComparison.OrdinalIgnoreCase))
+                .ThenBy(a => a)
+                .Take(12)
+                .ToArray();
+        }
+
+        _selectedIndex = -1;
+    }
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        var val = e.Value?.ToString() ?? "";
+        UpdateFilter(val);
+        _showSuggestions = true;
+        await ValueChanged.InvokeAsync(val);
+    }
+
+    private void OnFocus()
+    {
+        UpdateFilter(Value);
+        _showSuggestions = true;
+    }
+
+    private async Task OnBlur()
+    {
+        await Task.Delay(200);
+        _showSuggestions = false;
+    }
+
+    private async Task OnKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (!_showSuggestions || _filtered.Length == 0) return;
+
+        if (e.Key == "ArrowDown")
+        {
+            _selectedIndex = Math.Min(_selectedIndex + 1, Math.Min(_filtered.Length - 1, 11));
+        }
+        else if (e.Key == "ArrowUp")
+        {
+            _selectedIndex = Math.Max(_selectedIndex - 1, 0);
+        }
+        else if (e.Key == "Enter" && _selectedIndex >= 0 && _selectedIndex < _filtered.Length)
+        {
+            await SelectSuggestion(_filtered[_selectedIndex]);
+        }
+        else if (e.Key == "Escape")
+        {
+            _showSuggestions = false;
+        }
+    }
+
+    private async Task SelectSuggestion(string suggestion)
+    {
+        _showSuggestions = false;
+        _selectedIndex = -1;
+        await ValueChanged.InvokeAsync(suggestion);
+    }
+
+    private RenderFragment HighlightMatch(string suggestion) => builder =>
+    {
+        if (string.IsNullOrWhiteSpace(_currentInput))
+        {
+            builder.AddContent(0, suggestion);
+            return;
+        }
+
+        var idx = suggestion.IndexOf(_currentInput, StringComparison.OrdinalIgnoreCase);
+        if (idx < 0)
+        {
+            builder.AddContent(0, suggestion);
+            return;
+        }
+
+        if (idx > 0)
+            builder.AddContent(0, suggestion[..idx]);
+
+        builder.OpenElement(1, "strong");
+        builder.AddContent(2, suggestion[idx..(idx + _currentInput.Length)]);
+        builder.CloseElement();
+
+        if (idx + _currentInput.Length < suggestion.Length)
+            builder.AddContent(3, suggestion[(idx + _currentInput.Length)..]);
+    };
+}

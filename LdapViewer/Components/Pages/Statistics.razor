@@ -2,7 +2,7 @@
 @using System.Text.Json
 @using LdapViewer.Models
 @using LdapViewer.Services
-@inject LdapService LdapService
+@inject ConnectionManager ConnMgr
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @rendermode InteractiveServer
@@ -15,7 +15,7 @@
         <span class="spinner-border me-2"></span> Verbindung wird wiederhergestellt...
     </div>
 }
-else if (!LdapService.IsConnected)
+else if (!ConnMgr.IsConnected)
 {
     <div class="container mt-4">
         <div class="alert alert-warning">
@@ -171,7 +171,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (LdapService.IsConnected)
+        if (ConnMgr.IsConnected)
         {
             await LoadStatistics();
         }
@@ -179,11 +179,11 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && !LdapService.IsConnected)
+        if (firstRender && !ConnMgr.IsConnected)
         {
             await TryReconnect();
 
-            if (LdapService.IsConnected)
+            if (ConnMgr.IsConnected)
             {
                 await LoadStatistics();
             }
@@ -205,7 +205,7 @@ else
             _reconnecting = true;
             StateHasChanged();
 
-            await Task.Run(() => LdapService.Connect(settings));
+            await Task.Run(() => ConnMgr.AddConnection(settings));
         }
         catch
         {
@@ -224,10 +224,10 @@ else
 
         try
         {
-            var baseDn = LdapService.Settings!.BaseDn;
+            var baseDn = ConnMgr.Settings!.BaseDn;
 
-            _objectClassStats = await LdapService.GetStatistics(baseDn);
-            _ouStats = await LdapService.GetOuStatistics(baseDn);
+            _objectClassStats = await ConnMgr.Active!.GetStatistics(baseDn);
+            _ouStats = await ConnMgr.Active!.GetOuStatistics(baseDn);
 
             _totalEntries = _objectClassStats.GetValueOrDefault("top",
                 _objectClassStats.Values.DefaultIfEmpty(0).Max());

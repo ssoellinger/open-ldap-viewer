@@ -7,8 +7,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// LdapService is scoped per circuit (session)
-builder.Services.AddScoped<LdapService>();
+// ConnectionManager manages multiple LdapService instances per circuit (session)
+builder.Services.AddScoped<ConnectionManager>();
 
 var app = builder.Build();
 

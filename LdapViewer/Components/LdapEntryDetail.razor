@@ -18,24 +18,119 @@
             }
         </div>
         <div class="d-flex gap-1 flex-shrink-0 ms-2">
-            <button class="btn btn-sm btn-outline-secondary" @onclick="CopyDn" title="DN kopieren">
-                @(_copied == "dn" ? "Kopiert!" : "DN kopieren")
-            </button>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="ExportLdif" title="Als LDIF exportieren">
-                LDIF
-            </button>
-            @if (OnBookmark.HasDelegate)
+            @if (!_editMode)
             {
-                <button class="btn btn-sm @(IsBookmarked ? "btn-warning" : "btn-outline-warning")" @onclick="() => OnBookmark.InvokeAsync(Entry.Dn)" title="@(IsBookmarked ? "Lesezeichen entfernen" : "Lesezeichen setzen")">
-                    @(IsBookmarked ? "\u2605" : "\u2606")
+                <button class="btn btn-sm btn-outline-primary" @onclick="EnterEditMode" title="Bearbeiten">
+                    Bearbeiten
                 </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="CopyDn" title="DN kopieren">
+                    @(_copied == "dn" ? "Kopiert!" : "DN kopieren")
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ExportLdif" title="Als LDIF exportieren">
+                    LDIF
+                </button>
+                @if (OnCopy.HasDelegate)
+                {
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => OnCopy.InvokeAsync(Entry)" title="Eintrag als Vorlage kopieren">
+                        Kopieren
+                    </button>
+                }
+                @if (OnBookmark.HasDelegate)
+                {
+                    <button class="btn btn-sm @(IsBookmarked ? "btn-warning" : "btn-outline-warning")" @onclick="() => OnBookmark.InvokeAsync(Entry.Dn)" title="@(IsBookmarked ? "Lesezeichen entfernen" : "Lesezeichen setzen")">
+                        @(IsBookmarked ? "\u2605" : "\u2606")
+                    </button>
+                }
+                @if (OnDeleted.HasDelegate)
+                {
+                    @if (_confirmDelete)
+                    {
+                        <button class="btn btn-sm btn-danger" @onclick="DeleteEntry">Wirklich loeschen?</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _confirmDelete = false">Abbrechen</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => _confirmDelete = true" title="Eintrag loeschen">
+                            Loeschen
+                        </button>
+                    }
+                }
+            }
+            else
+            {
+                <button class="btn btn-sm btn-success" @onclick="SaveChanges" disabled="@_saving">
+                    @if (_saving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Speichern
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="CancelEdit">Abbrechen</button>
             }
         </div>
     </div>
 
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger alert-sm py-1 px-2 small">@_error</div>
+    }
+
+    @if (!string.IsNullOrEmpty(_success))
+    {
+        <div class="alert alert-success alert-sm py-1 px-2 small">@_success</div>
+    }
+
     @if (Entry.Attributes.Count == 0)
     {
         <p class="text-muted">Keine Attribute vorhanden.</p>
+    }
+    else if (_editMode)
+    {
+        <table class="table table-sm table-striped edit-table">
+            <thead>
+                <tr>
+                    <th style="width: 30%">Attribut</th>
+                    <th>Wert(e)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var attr in _editAttributes.OrderBy(a => a.Key))
+                {
+                    var attrName = attr.Key;
+                    <tr>
+                        <td class="attr-name">@attrName</td>
+                        <td class="attr-value">
+                            @for (int vi = 0; vi < attr.Value.Count; vi++)
+                            {
+                                var valueIdx = vi;
+                                <div class="edit-value-row">
+                                    <input type="text" class="form-control form-control-sm edit-input"
+                                           value="@attr.Value[valueIdx]"
+                                           @onchange="(e) => UpdateEditValue(attrName, valueIdx, e.Value?.ToString() ?? string.Empty)" />
+                                    <button class="btn btn-sm btn-outline-danger edit-remove-btn" @onclick="() => RemoveEditValue(attrName, valueIdx)" title="Wert entfernen">X</button>
+                                </div>
+                            }
+                            <button class="btn btn-sm btn-outline-secondary edit-add-value-btn" @onclick="() => AddEditValue(attrName)">+ Wert</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="edit-new-attribute">
+            <div class="d-flex gap-1 align-items-end">
+                <div>
+                    <label class="form-label small mb-0">Neues Attribut</label>
+                    <AttributeAutocomplete Value="@_newAttrName" ValueChanged="(v) => _newAttrName = v"
+                                           ExtraSuggestions="@(_schemaAttributes)" Placeholder="Attribut-Name" />
+                </div>
+                <div class="flex-grow-1">
+                    <label class="form-label small mb-0">Wert</label>
+                    <input type="text" class="form-control form-control-sm" @bind="_newAttrValue" placeholder="Wert" />
+                </div>
+                <button class="btn btn-sm btn-outline-primary" @onclick="AddNewAttribute" disabled="@(string.IsNullOrWhiteSpace(_newAttrName))">Hinzufuegen</button>
+            </div>
+        </div>
     }
     else
     {
@@ -106,6 +201,9 @@
     [Parameter, EditorRequired]
     public LdapEntry Entry { get; set; } = default!;
 
+    [Parameter, EditorRequired]
+    public LdapService LdapService { get; set; } = default!;
+
     [Parameter]
     public EventCallback<string> OnBookmark { get; set; }
 
@@ -115,7 +213,28 @@
     [Parameter]
     public EventCallback<string> OnNavigate { get; set; }
 
+    [Parameter]
+    public EventCallback OnDeleted { get; set; }
+
+    [Parameter]
+    public EventCallback<LdapEntry> OnModified { get; set; }
+
+    [Parameter]
+    public EventCallback<LdapEntry> OnCopy { get; set; }
+
     private string? _copied;
+    private bool _editMode;
+    private bool _saving;
+    private bool _confirmDelete;
+    private string? _error;
+    private string? _success;
+    private string _newAttrName = "";
+    private string _newAttrValue = "";
+
+    // Edit state: deep copy of attributes
+    private Dictionary<string, List<string>> _editAttributes = new();
+    private Dictionary<string, List<string>> _originalAttributes = new();
+    private string[]? _schemaAttributes;
 
     private static readonly HashSet<string> MemberAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -132,6 +251,227 @@
         return value.Contains('=') && value.Contains(',');
     }
 
+    // Edit Mode
+    private async Task EnterEditMode()
+    {
+        _editMode = true;
+        _error = null;
+        _success = null;
+        _editAttributes = Entry.Attributes.ToDictionary(
+            a => a.Key,
+            a => new List<string>(a.Value));
+        _originalAttributes = Entry.Attributes.ToDictionary(
+            a => a.Key,
+            a => new List<string>(a.Value));
+
+        // Load allowed attributes for this entry's objectClasses
+        try
+        {
+            var schema = await LdapService.GetSchema();
+            var objectClasses = Entry.Attributes
+                .Where(a => a.Key.Equals("objectClass", StringComparison.OrdinalIgnoreCase))
+                .SelectMany(a => a.Value)
+                .ToList();
+
+            if (objectClasses.Count > 0)
+            {
+                var allowed = schema.GetAllowedAttributes(objectClasses);
+                _schemaAttributes = allowed.OrderBy(a => a, StringComparer.OrdinalIgnoreCase).ToArray();
+            }
+            else
+            {
+                _schemaAttributes = schema.AttributeTypes.Select(a => a.Name).ToArray();
+            }
+        }
+        catch
+        {
+            _schemaAttributes = null;
+        }
+    }
+
+    private void CancelEdit()
+    {
+        _editMode = false;
+        _error = null;
+        _success = null;
+        _newAttrName = "";
+        _newAttrValue = "";
+    }
+
+    private void UpdateEditValue(string attrName, int index, string newValue)
+    {
+        if (_editAttributes.TryGetValue(attrName, out var values) && index < values.Count)
+        {
+            values[index] = newValue;
+        }
+    }
+
+    private void RemoveEditValue(string attrName, int index)
+    {
+        if (_editAttributes.TryGetValue(attrName, out var values) && index < values.Count)
+        {
+            values.RemoveAt(index);
+            if (values.Count == 0)
+            {
+                _editAttributes.Remove(attrName);
+            }
+        }
+    }
+
+    private void AddEditValue(string attrName)
+    {
+        if (_editAttributes.TryGetValue(attrName, out var values))
+        {
+            values.Add("");
+        }
+    }
+
+    private void AddNewAttribute()
+    {
+        if (string.IsNullOrWhiteSpace(_newAttrName)) return;
+
+        var name = _newAttrName.Trim();
+        var value = _newAttrValue.Trim();
+
+        if (_editAttributes.ContainsKey(name))
+        {
+            _editAttributes[name].Add(value);
+        }
+        else
+        {
+            _editAttributes[name] = new List<string> { value };
+        }
+
+        _newAttrName = "";
+        _newAttrValue = "";
+    }
+
+    private async Task SaveChanges()
+    {
+        _saving = true;
+        _error = null;
+        _success = null;
+        StateHasChanged();
+
+        try
+        {
+            var modifications = ComputeModifications();
+            if (modifications.Count == 0)
+            {
+                _editMode = false;
+                _saving = false;
+                return;
+            }
+
+            await LdapService.ModifyEntry(Entry.Dn, modifications);
+
+            // Reload the entry
+            var updated = await LdapService.GetEntry(Entry.Dn);
+            if (updated != null)
+            {
+                Entry = updated;
+                if (OnModified.HasDelegate)
+                    await OnModified.InvokeAsync(updated);
+            }
+
+            _editMode = false;
+            _success = "Aenderungen gespeichert.";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Fehler beim Speichern: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private List<LdapModification> ComputeModifications()
+    {
+        var mods = new List<LdapModification>();
+
+        // Find deleted attributes
+        foreach (var orig in _originalAttributes)
+        {
+            if (!_editAttributes.ContainsKey(orig.Key))
+            {
+                mods.Add(new LdapModification
+                {
+                    AttributeName = orig.Key,
+                    Type = LdapModificationType.Delete
+                });
+            }
+        }
+
+        // Find added/modified attributes
+        foreach (var edit in _editAttributes)
+        {
+            var values = edit.Value.Where(v => !string.IsNullOrEmpty(v)).ToList();
+            if (values.Count == 0)
+            {
+                if (_originalAttributes.ContainsKey(edit.Key))
+                {
+                    mods.Add(new LdapModification
+                    {
+                        AttributeName = edit.Key,
+                        Type = LdapModificationType.Delete
+                    });
+                }
+                continue;
+            }
+
+            if (!_originalAttributes.TryGetValue(edit.Key, out var origValues))
+            {
+                // New attribute - add each value
+                foreach (var val in values)
+                {
+                    mods.Add(new LdapModification
+                    {
+                        AttributeName = edit.Key,
+                        NewValue = val,
+                        Type = LdapModificationType.Add
+                    });
+                }
+            }
+            else if (!origValues.SequenceEqual(values))
+            {
+                // Changed - use replace with each value
+                foreach (var val in values)
+                {
+                    mods.Add(new LdapModification
+                    {
+                        AttributeName = edit.Key,
+                        NewValue = val,
+                        Type = LdapModificationType.Replace
+                    });
+                }
+            }
+        }
+
+        return mods;
+    }
+
+    // Delete
+    private async Task DeleteEntry()
+    {
+        _error = null;
+
+        try
+        {
+            await LdapService.DeleteEntry(Entry.Dn);
+            _confirmDelete = false;
+            if (OnDeleted.HasDelegate)
+                await OnDeleted.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Fehler beim Loeschen: {ex.Message}";
+            _confirmDelete = false;
+        }
+    }
+
+    // Navigation
     private static List<string> ParseDnSegments(string dn)
     {
         var segments = new List<string>();

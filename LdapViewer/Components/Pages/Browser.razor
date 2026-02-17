@@ -2,7 +2,7 @@
 @using System.Text.Json
 @using LdapViewer.Models
 @using LdapViewer.Services
-@inject LdapService LdapService
+@inject ConnectionManager ConnMgr
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @rendermode InteractiveServer
@@ -15,7 +15,7 @@
         <span class="spinner-border me-2"></span> Verbindung wird wiederhergestellt...
     </div>
 }
-else if (!LdapService.IsConnected)
+else if (!ConnMgr.IsConnected)
 {
     <div class="container mt-4">
         <div class="alert alert-warning">
@@ -25,6 +25,26 @@ else if (!LdapService.IsConnected)
 }
 else
 {
+    @* Connection Tabs *@
+    @if (ConnMgr.GetAll().Count > 1)
+    {
+        <div class="connection-tabs">
+            @foreach (var conn in ConnMgr.GetAll())
+            {
+                var connId = conn.Id;
+                var connName = conn.Name;
+                var connActive = conn.IsActive;
+                <div class="connection-tab @(connActive ? "active" : "")" @onclick="() => SwitchConnection(connId)">
+                    <span class="connection-tab-label">@connName</span>
+                    <button class="connection-tab-close" @onclick:stopPropagation="true" @onclick="() => CloseConnection(connId)" title="Verbindung schliessen">X</button>
+                </div>
+            }
+            <div class="connection-tab connection-tab-add" @onclick="AddNewConnection" title="Neue Verbindung">
+                +
+            </div>
+        </div>
+    }
+
     <div class="ldap-browser">
         <div class="ldap-tree-panel">
             <div class="panel-header">
@@ -34,12 +54,18 @@ else
                 </button>
             </div>
             <div class="panel-toolbar d-flex gap-1">
+                <button class="btn btn-sm btn-outline-success" @onclick="ShowCreateEntry" title="Neuer Eintrag">
+                    + Neu
+                </button>
                 <button class="btn btn-sm btn-outline-primary flex-grow-1" @onclick="ExpandAll" disabled="@_expanding">
                     @if (_expanding)
                     {
                         <span class="spinner-border spinner-border-sm me-1"></span>
                     }
-                    Alle aufklappen
+                    Aufklappen
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="CollapseAll">
+                    Zuklappen
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="ExportSubtreeLdif" disabled="@_exporting" title="Gesamten Baum als LDIF exportieren">
                     @if (_exporting)
@@ -92,10 +118,10 @@ else
                 {
                     @foreach (var entry in _rootEntries)
                     {
-                        <LdapTree @key="entry.Dn"
+                        <LdapTree @key="@($"{entry.Dn}_{_treeVersion}")"
                                   @ref="_rootTreeRef"
                                   Entry="entry"
-                                  LdapService="LdapService"
+                                  LdapService="ConnMgr.Active!"
                                   SelectedDn="@_selectedDn"
                                   OnSelect="HandleTreeSelect"
                                   AutoExpand="true" />
@@ -168,7 +194,15 @@ else
                 }
             </div>
 
-            @if (_searchResults != null)
+            @if (_showCreateEntry)
+            {
+                <LdapEntryEditor LdapService="ConnMgr.Active!"
+                                 ParentDn="@(_selectedDn ?? ConnMgr.Settings!.BaseDn)"
+                                 CopyFrom="@_copySource"
+                                 OnCreated="HandleEntryCreated"
+                                 OnCancel="CancelCreateEntry" />
+            }
+            else if (_searchResults != null)
             {
                 <div class="search-results-panel">
                     <div class="search-results-list">
@@ -189,9 +223,13 @@ else
                         @if (_selectedEntry != null)
                         {
                             <LdapEntryDetail Entry="_selectedEntry"
+                                             LdapService="ConnMgr.Active!"
                                              OnBookmark="ToggleBookmark"
                                              IsBookmarked="@_bookmarks.Contains(_selectedEntry.Dn)"
-                                             OnNavigate="HandleBreadcrumbNavigate" />
+                                             OnNavigate="HandleBreadcrumbNavigate"
+                                             OnDeleted="HandleEntryDeleted"
+                                             OnModified="HandleEntryModified"
+                                             OnCopy="HandleCopyEntry" />
                         }
                         else
                         {
@@ -203,9 +241,13 @@ else
             else if (_selectedEntry != null)
             {
                 <LdapEntryDetail Entry="_selectedEntry"
+                                 LdapService="ConnMgr.Active!"
                                  OnBookmark="ToggleBookmark"
                                  IsBookmarked="@_bookmarks.Contains(_selectedEntry.Dn)"
-                                 OnNavigate="HandleBreadcrumbNavigate" />
+                                 OnNavigate="HandleBreadcrumbNavigate"
+                                 OnDeleted="HandleEntryDeleted"
+                                 OnModified="HandleEntryModified"
+                                 OnCopy="HandleCopyEntry" />
             }
             else
             {
@@ -225,6 +267,9 @@ else
     private bool _expanding;
     private bool _reconnecting;
     private bool _exporting;
+    private bool _showCreateEntry;
+    private LdapEntry? _copySource;
+    private int _treeVersion;
 
     // Search
     private string _searchAttribute = "";
@@ -248,7 +293,7 @@ else
             await LoadBookmarks();
             await LoadSearchHistory();
 
-            if (!LdapService.IsConnected)
+            if (!ConnMgr.IsConnected)
             {
                 await TryReconnect();
             }
@@ -259,10 +304,89 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (LdapService.IsConnected)
+        if (ConnMgr.IsConnected)
         {
             await LoadRootEntries();
         }
+    }
+
+    // Connection Tabs
+    private async Task SwitchConnection(string id)
+    {
+        ConnMgr.SetActive(id);
+        _selectedDn = null;
+        _selectedEntry = null;
+        _searchResults = null;
+        _showCreateEntry = false;
+        await LoadRootEntries();
+        StateHasChanged();
+    }
+
+    private async Task CloseConnection(string id)
+    {
+        ConnMgr.RemoveConnection(id);
+
+        if (!ConnMgr.IsConnected)
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        _selectedDn = null;
+        _selectedEntry = null;
+        _searchResults = null;
+        await LoadRootEntries();
+        StateHasChanged();
+    }
+
+    private void AddNewConnection()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    // Create Entry
+    private void ShowCreateEntry()
+    {
+        _showCreateEntry = true;
+        _copySource = null;
+        _searchResults = null;
+    }
+
+    private void CancelCreateEntry()
+    {
+        _showCreateEntry = false;
+        _copySource = null;
+    }
+
+    private async Task HandleEntryCreated(string dn)
+    {
+        _showCreateEntry = false;
+        _copySource = null;
+        _treeVersion++;
+        await LoadRootEntries();
+        await HandleTreeSelect(dn);
+    }
+
+    private void HandleCopyEntry(LdapEntry entry)
+    {
+        _copySource = entry;
+        _showCreateEntry = true;
+        _searchResults = null;
+    }
+
+    // Delete/Modify callbacks
+    private async Task HandleEntryDeleted()
+    {
+        _selectedDn = null;
+        _selectedEntry = null;
+        _treeVersion++;
+        await LoadRootEntries();
+    }
+
+    private async Task HandleEntryModified(LdapEntry updatedEntry)
+    {
+        _selectedEntry = updatedEntry;
+        StateHasChanged();
     }
 
     // Search History
@@ -287,11 +411,8 @@ else
 
     private async Task AddToSearchHistory(string attribute, string value)
     {
-        // Remove duplicate if exists
         _searchHistory.RemoveAll(h => h.Attribute == attribute && h.Value == value);
-        // Insert at beginning
         _searchHistory.Insert(0, new SearchHistoryItem { Attribute = attribute, Value = value });
-        // Keep max 20
         if (_searchHistory.Count > 20)
             _searchHistory = _searchHistory.Take(20).ToList();
         await SaveSearchHistory();
@@ -366,7 +487,7 @@ else
             _reconnecting = true;
             StateHasChanged();
 
-            await Task.Run(() => LdapService.Connect(settings));
+            await Task.Run(() => ConnMgr.AddConnection(settings));
             await LoadRootEntries();
         }
         catch
@@ -384,8 +505,8 @@ else
     {
         try
         {
-            var baseDn = LdapService.Settings!.BaseDn;
-            var baseEntry = await LdapService.GetEntry(baseDn);
+            var baseDn = ConnMgr.Settings!.BaseDn;
+            var baseEntry = await ConnMgr.Active!.GetEntry(baseDn);
             if (baseEntry != null)
             {
                 baseEntry.HasChildren = true;
@@ -408,10 +529,11 @@ else
         _selectedDn = dn;
         _searchResults = null;
         _searchError = null;
+        _showCreateEntry = false;
 
         try
         {
-            _selectedEntry = await LdapService.GetEntry(dn);
+            _selectedEntry = await ConnMgr.Active!.GetEntry(dn);
         }
         catch (Exception ex)
         {
@@ -431,9 +553,9 @@ else
 
         try
         {
-            _selectedEntry = await LdapService.GetEntry(dn);
+            _selectedEntry = await ConnMgr.Active!.GetEntry(dn);
         }
-        catch (Exception ex)
+        catch
         {
             _selectedEntry = null;
         }
@@ -457,6 +579,7 @@ else
         _selectedEntry = null;
         _selectedDn = null;
         _showSearchHistory = false;
+        _showCreateEntry = false;
         StateHasChanged();
 
         try
@@ -464,21 +587,19 @@ else
             string filter;
             if (_searchAttribute == "")
             {
-                // Raw LDAP filter
                 filter = _searchValue.Trim();
                 if (!filter.StartsWith("("))
                     filter = $"({filter})";
             }
             else
             {
-                // Attribute-based search
                 var val = _searchValue.Trim();
                 if (!val.Contains('*'))
                     val = $"*{val}*";
                 filter = $"({_searchAttribute}={val})";
             }
 
-            _searchResults = await LdapService.Search(LdapService.Settings!.BaseDn, filter);
+            _searchResults = await ConnMgr.Active!.Search(ConnMgr.Settings!.BaseDn, filter);
             await AddToSearchHistory(_searchAttribute, _searchValue.Trim());
         }
         catch (Exception ex)
@@ -516,6 +637,11 @@ else
         }
     }
 
+    private void CollapseAll()
+    {
+        _rootTreeRef?.CollapseAll();
+    }
+
     private async Task ExportSubtreeLdif()
     {
         _exporting = true;
@@ -523,7 +649,7 @@ else
 
         try
         {
-            var entries = await LdapService.GetSubtree(LdapService.Settings!.BaseDn);
+            var entries = await ConnMgr.Active!.GetSubtree(ConnMgr.Settings!.BaseDn);
             var ldif = LdapService.ToLdif(entries);
             await JS.InvokeVoidAsync("downloadFile", "export.ldif", ldif);
         }
@@ -548,7 +674,10 @@ else
 
     private async Task Disconnect()
     {
-        LdapService.Disconnect();
+        if (ConnMgr.ActiveId != null)
+        {
+            ConnMgr.RemoveConnection(ConnMgr.ActiveId);
+        }
         await JS.InvokeVoidAsync("connectionStorage.clearLastConnection");
         Navigation.NavigateTo("/");
     }

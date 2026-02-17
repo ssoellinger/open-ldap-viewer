@@ -136,6 +136,18 @@
         }
     }
 
+    public void CollapseAll()
+    {
+        _expanded = false;
+
+        foreach (var childRef in _childRefs.Values)
+        {
+            childRef?.CollapseAll();
+        }
+
+        StateHasChanged();
+    }
+
     private async Task Expand()
     {
         if (_isLeaf) return;

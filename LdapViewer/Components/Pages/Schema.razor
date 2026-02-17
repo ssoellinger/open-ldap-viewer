@@ -1,14 +1,14 @@
 @page "/schema"
 @using LdapViewer.Models
 @using LdapViewer.Services
-@inject LdapService LdapService
+@inject ConnectionManager ConnMgr
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
 <PageTitle>Open LDAP Viewer - Schema</PageTitle>
 
-@if (!LdapService.IsConnected)
+@if (!ConnMgr.IsConnected)
 {
     <div class="container mt-4">
         <div class="alert alert-warning">
@@ -133,12 +133,12 @@ else if (_schema != null)
 
     protected override async Task OnInitializedAsync()
     {
-        if (!LdapService.IsConnected) return;
+        if (!ConnMgr.IsConnected) return;
 
         _loading = true;
         try
         {
-            _schema = await LdapService.GetSchema();
+            _schema = await ConnMgr.Active!.GetSchema();
         }
         catch (Exception ex)
         {

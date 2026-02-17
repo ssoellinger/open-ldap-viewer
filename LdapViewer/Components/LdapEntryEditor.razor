@@ -1,0 +1,496 @@
+@using LdapViewer.Models
+@using LdapViewer.Services
+
+<div class="entry-editor p-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Neuer Eintrag</h5>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Cancel">Abbrechen</button>
+    </div>
+
+    @* Templates *@
+    <div class="mb-3">
+        <label class="form-label small fw-bold">Vorlage</label>
+        <div class="d-flex flex-wrap gap-1">
+            <button class="btn btn-sm @(_activeTemplate == "person" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("person")'>Person</button>
+            <button class="btn btn-sm @(_activeTemplate == "group" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("group")'>Gruppe</button>
+            <button class="btn btn-sm @(_activeTemplate == "ou" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("ou")'>Org.-Einheit</button>
+            <button class="btn btn-sm @(_activeTemplate == "posixUser" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("posixUser")'>POSIX-User</button>
+            <button class="btn btn-sm @(_activeTemplate == "posixGroup" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ApplyTemplate("posixGroup")'>POSIX-Gruppe</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearTemplate">Leer</button>
+        </div>
+    </div>
+
+    @* RDN *@
+    <div class="mb-3">
+        <label class="form-label small fw-bold">
+            RDN
+            @if (!string.IsNullOrEmpty(_rdnHint))
+            {
+                <span class="text-muted fw-normal"> (z.B. @_rdnHint)</span>
+            }
+        </label>
+        <input type="text" class="form-control form-control-sm" @bind="_rdn" placeholder="@(_rdnHint ?? "cn=NeuerEintrag")" />
+    </div>
+
+    @* Parent DN *@
+    <div class="mb-3">
+        <label class="form-label small fw-bold">Parent DN</label>
+        <input type="text" class="form-control form-control-sm" @bind="_parentDn" />
+        <div class="form-text small">Vollstaendiger DN: <code>@FullDnPreview</code></div>
+    </div>
+
+    @* objectClasses *@
+    <div class="mb-3">
+        <label class="form-label small fw-bold">objectClass <span class="text-danger">*</span></label>
+        @for (int i = 0; i < _objectClasses.Count; i++)
+        {
+            var idx = i;
+            <div class="d-flex gap-1 mb-1">
+                <div class="flex-grow-1">
+                    <AttributeAutocomplete Value="@_objectClasses[idx]"
+                                           ValueChanged="(v) => OnObjectClassChanged(idx, v)"
+                                           ExtraSuggestions="@(_schemaObjectClassNames)"
+                                           Placeholder="z.B. inetOrgPerson" />
+                </div>
+                @if (_objectClasses.Count > 1)
+                {
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveObjectClass(idx)">X</button>
+                }
+            </div>
+        }
+        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _objectClasses.Add(string.Empty)">+ objectClass</button>
+    </div>
+
+    @* Required attributes (MUST) *@
+    @if (_requiredAttributes.Count > 0)
+    {
+        <div class="mb-3">
+            <label class="form-label small fw-bold">Pflichtattribute <span class="text-danger">*</span></label>
+            @foreach (var attr in _requiredAttributes)
+            {
+                var attrName = attr;
+                <div class="d-flex gap-1 mb-1 align-items-center">
+                    <span class="editor-attr-label editor-attr-required" title="Pflichtattribut">@attrName</span>
+                    <input type="text" class="form-control form-control-sm"
+                           value="@GetAttrValue(attrName)"
+                           @onchange="(e) => SetAttrValue(attrName, e.Value?.ToString() ?? string.Empty)"
+                           placeholder="@attrName" />
+                </div>
+            }
+        </div>
+    }
+
+    @* Additional attributes *@
+    <div class="mb-3">
+        <label class="form-label small fw-bold">Weitere Attribute</label>
+        @for (int i = 0; i < _extraAttributes.Count; i++)
+        {
+            var idx = i;
+            <div class="d-flex gap-1 mb-1">
+                <div style="width: 40%">
+                    <AttributeAutocomplete Value="@_extraAttributes[idx].Name"
+                                           ValueChanged="(v) => _extraAttributes[idx] = (_extraAttributes[idx] with { Name = v })"
+                                           ExtraSuggestions="@(_allowedAttributeNames)"
+                                           Placeholder="Attribut" />
+                </div>
+                <input type="text" class="form-control form-control-sm"
+                       value="@_extraAttributes[idx].Value"
+                       @onchange="(e) => _extraAttributes[idx] = (_extraAttributes[idx] with { Value = e.Value?.ToString() ?? string.Empty })"
+                       placeholder="Wert" />
+                <button class="btn btn-sm btn-outline-danger" @onclick="() => _extraAttributes.RemoveAt(idx)">X</button>
+            </div>
+        }
+        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _extraAttributes.Add(new AttrPair(string.Empty, string.Empty))">+ Attribut</button>
+    </div>
+
+    @* Validation warnings *@
+    @if (_warnings.Count > 0)
+    {
+        <div class="alert alert-warning small py-1 px-2 mb-2">
+            <ul class="mb-0 ps-3">
+                @foreach (var w in _warnings)
+                {
+                    <li>@w</li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger small py-1 px-2">@_error</div>
+    }
+
+    @if (!string.IsNullOrEmpty(_success))
+    {
+        <div class="alert alert-success small py-1 px-2">@_success</div>
+    }
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-success" @onclick="CreateEntry" disabled="@_creating">
+            @if (_creating)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+            }
+            Erstellen
+        </button>
+        <button class="btn btn-outline-secondary" @onclick="Cancel">Abbrechen</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public LdapService LdapService { get; set; } = default!;
+
+    [Parameter]
+    public string ParentDn { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> OnCreated { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    [Parameter]
+    public LdapEntry? CopyFrom { get; set; }
+
+    private string _rdn = "";
+    private string _parentDn = "";
+    private List<string> _objectClasses = new() { "top" };
+    private List<AttrPair> _extraAttributes = new();
+    private Dictionary<string, string> _requiredAttrValues = new(StringComparer.OrdinalIgnoreCase);
+    private string? _error;
+    private string? _success;
+    private bool _creating;
+    private string? _activeTemplate;
+    private string? _rdnHint;
+    private List<string> _warnings = new();
+
+    // Schema data
+    private LdapSchema? _schema;
+    private string[]? _schemaObjectClassNames;
+    private string[]? _allowedAttributeNames;
+    private HashSet<string> _requiredAttributes = new(StringComparer.OrdinalIgnoreCase);
+
+    private string FullDnPreview =>
+        string.IsNullOrWhiteSpace(_rdn) && string.IsNullOrWhiteSpace(_parentDn)
+            ? "(leer)"
+            : string.IsNullOrWhiteSpace(_rdn)
+                ? _parentDn
+                : string.IsNullOrWhiteSpace(_parentDn)
+                    ? _rdn.Trim()
+                    : $"{_rdn.Trim()},{_parentDn.Trim()}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _schema = await LdapService.GetSchema();
+            _schemaObjectClassNames = _schema.ObjectClasses
+                .Select(oc => oc.Name)
+                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+        catch
+        {
+            _schema = null;
+            _schemaObjectClassNames = [];
+        }
+    }
+
+    private bool _copyApplied;
+
+    protected override void OnParametersSet()
+    {
+        _parentDn = ParentDn;
+
+        if (CopyFrom != null && !_copyApplied)
+        {
+            _copyApplied = true;
+            ApplyCopyFrom(CopyFrom);
+        }
+    }
+
+    private void ApplyCopyFrom(LdapEntry source)
+    {
+        _activeTemplate = null;
+        _objectClasses.Clear();
+        _extraAttributes.Clear();
+        _requiredAttrValues.Clear();
+
+        // Extract parent DN and RDN from source
+        var dn = source.Dn;
+        var commaIdx = dn.IndexOf(',');
+        if (commaIdx > 0)
+        {
+            _rdn = dn[..commaIdx];
+            _parentDn = dn[(commaIdx + 1)..];
+        }
+
+        // Set objectClasses
+        if (source.Attributes.TryGetValue("objectClass", out var ocValues))
+        {
+            _objectClasses = new List<string>(ocValues);
+        }
+
+        // Set all other attributes
+        foreach (var attr in source.Attributes)
+        {
+            if (attr.Key.Equals("objectClass", StringComparison.OrdinalIgnoreCase)) continue;
+            // Skip operational attributes
+            if (IsOperationalAttribute(attr.Key)) continue;
+
+            foreach (var val in attr.Value)
+            {
+                _extraAttributes.Add(new AttrPair(attr.Key, val));
+            }
+        }
+
+        RefreshSchemaInfo();
+
+        // Move required attrs from extra to required values
+        var toRemove = new List<int>();
+        for (int i = _extraAttributes.Count - 1; i >= 0; i--)
+        {
+            if (_requiredAttributes.Contains(_extraAttributes[i].Name))
+            {
+                _requiredAttrValues[_extraAttributes[i].Name] = _extraAttributes[i].Value;
+                _extraAttributes.RemoveAt(i);
+            }
+        }
+    }
+
+    private static bool IsOperationalAttribute(string name)
+    {
+        return name.Equals("entryDN", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("entryUUID", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("structuralObjectClass", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("subschemaSubentry", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("hasSubordinates", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("numSubordinates", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("createTimestamp", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("modifyTimestamp", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("creatorsName", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("modifiersName", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("entryCSN", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("contextCSN", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void OnObjectClassChanged(int index, string value)
+    {
+        _objectClasses[index] = value;
+        RefreshSchemaInfo();
+    }
+
+    private void RemoveObjectClass(int index)
+    {
+        _objectClasses.RemoveAt(index);
+        RefreshSchemaInfo();
+    }
+
+    private void RefreshSchemaInfo()
+    {
+        if (_schema == null) return;
+
+        var classes = _objectClasses.Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
+        if (classes.Count == 0)
+        {
+            _requiredAttributes = new(StringComparer.OrdinalIgnoreCase);
+            _allowedAttributeNames = _schemaObjectClassNames;
+            _rdnHint = null;
+            return;
+        }
+
+        // Get required and allowed attributes
+        _requiredAttributes = _schema.GetRequiredAttributes(classes);
+        // Remove objectClass from required since we handle it separately
+        _requiredAttributes.Remove("objectClass");
+
+        var allowed = _schema.GetAllowedAttributes(classes);
+        allowed.ExceptWith(_requiredAttributes);
+        allowed.Remove("objectClass");
+        _allowedAttributeNames = allowed.OrderBy(a => a, StringComparer.OrdinalIgnoreCase).ToArray();
+
+        // Update RDN hint
+        _rdnHint = LdapSchema.GetTypicalRdnAttribute(classes) is { } rdnAttr
+            ? $"{rdnAttr}=..."
+            : null;
+
+        // Auto-populate required attribute values dict for any new ones
+        foreach (var req in _requiredAttributes)
+        {
+            if (!_requiredAttrValues.ContainsKey(req))
+                _requiredAttrValues[req] = "";
+        }
+
+        // Remove extra attributes that are now shown as required
+        _extraAttributes.RemoveAll(a => _requiredAttributes.Contains(a.Name));
+
+        StateHasChanged();
+    }
+
+    private string GetAttrValue(string attrName)
+    {
+        return _requiredAttrValues.TryGetValue(attrName, out var val) ? val : "";
+    }
+
+    private void SetAttrValue(string attrName, string value)
+    {
+        _requiredAttrValues[attrName] = value;
+    }
+
+    private void ApplyTemplate(string template)
+    {
+        _activeTemplate = template;
+        _objectClasses.Clear();
+        _extraAttributes.Clear();
+        _requiredAttrValues.Clear();
+        _rdn = "";
+
+        switch (template)
+        {
+            case "person":
+                _objectClasses.AddRange(["top", "inetOrgPerson"]);
+                _extraAttributes.Add(new AttrPair("mail", ""));
+                _extraAttributes.Add(new AttrPair("telephoneNumber", ""));
+                _extraAttributes.Add(new AttrPair("title", ""));
+                break;
+
+            case "group":
+                _objectClasses.AddRange(["top", "groupOfNames"]);
+                _extraAttributes.Add(new AttrPair("description", ""));
+                break;
+
+            case "ou":
+                _objectClasses.AddRange(["top", "organizationalUnit"]);
+                _extraAttributes.Add(new AttrPair("description", ""));
+                break;
+
+            case "posixUser":
+                _objectClasses.AddRange(["top", "inetOrgPerson", "posixAccount", "shadowAccount"]);
+                _extraAttributes.Add(new AttrPair("mail", ""));
+                _extraAttributes.Add(new AttrPair("loginShell", "/bin/bash"));
+                break;
+
+            case "posixGroup":
+                _objectClasses.AddRange(["top", "posixGroup"]);
+                _extraAttributes.Add(new AttrPair("description", ""));
+                break;
+        }
+
+        RefreshSchemaInfo();
+    }
+
+    private void ClearTemplate()
+    {
+        _activeTemplate = null;
+        _objectClasses = new() { "top" };
+        _extraAttributes.Clear();
+        _requiredAttrValues.Clear();
+        _requiredAttributes.Clear();
+        _allowedAttributeNames = null;
+        _rdnHint = null;
+        _rdn = "";
+    }
+
+    private List<string> Validate()
+    {
+        var warnings = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(_rdn))
+            warnings.Add("RDN ist leer.");
+
+        var classes = _objectClasses.Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
+        if (classes.Count == 0)
+            warnings.Add("Mindestens eine objectClass ist erforderlich.");
+
+        // Check required attributes have values
+        foreach (var req in _requiredAttributes)
+        {
+            if (!_requiredAttrValues.TryGetValue(req, out var val) || string.IsNullOrWhiteSpace(val))
+            {
+                // Check if it's in extra attributes
+                var extra = _extraAttributes.FirstOrDefault(a => a.Name.Equals(req, StringComparison.OrdinalIgnoreCase));
+                if (string.IsNullOrWhiteSpace(extra.Value))
+                    warnings.Add($"Pflichtattribut '{req}' hat keinen Wert.");
+            }
+        }
+
+        return warnings;
+    }
+
+    private async Task CreateEntry()
+    {
+        _error = null;
+        _success = null;
+
+        _warnings = Validate();
+        // Only block on critical errors
+        var classes = _objectClasses.Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
+        if (string.IsNullOrWhiteSpace(_rdn))
+        {
+            _error = "RDN muss ausgefuellt sein.";
+            return;
+        }
+        if (classes.Count == 0)
+        {
+            _error = "Mindestens eine objectClass ist erforderlich.";
+            return;
+        }
+
+        _creating = true;
+        StateHasChanged();
+
+        try
+        {
+            var dn = $"{_rdn.Trim()},{_parentDn.Trim()}";
+            var attrs = new Dictionary<string, List<string>>
+            {
+                ["objectClass"] = classes
+            };
+
+            // Add required attributes
+            foreach (var req in _requiredAttributes)
+            {
+                if (_requiredAttrValues.TryGetValue(req, out var val) && !string.IsNullOrWhiteSpace(val))
+                {
+                    if (!attrs.ContainsKey(req))
+                        attrs[req] = new List<string>();
+                    attrs[req].Add(val.Trim());
+                }
+            }
+
+            // Add extra attributes
+            foreach (var attr in _extraAttributes)
+            {
+                if (string.IsNullOrWhiteSpace(attr.Name) || string.IsNullOrWhiteSpace(attr.Value)) continue;
+                var name = attr.Name.Trim();
+                if (!attrs.ContainsKey(name))
+                    attrs[name] = new List<string>();
+                attrs[name].Add(attr.Value.Trim());
+            }
+
+            await LdapService.CreateEntry(dn, attrs);
+
+            _success = $"Eintrag '{dn}' erstellt.";
+            if (OnCreated.HasDelegate)
+                await OnCreated.InvokeAsync(dn);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Fehler beim Erstellen: {ex.Message}";
+        }
+        finally
+        {
+            _creating = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        if (OnCancel.HasDelegate)
+            await OnCancel.InvokeAsync();
+    }
+
+    private record struct AttrPair(string Name, string Value);
+}
