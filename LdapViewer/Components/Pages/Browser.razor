@@ -1,0 +1,561 @@
+@page "/browser"
+@using System.Text.Json
+@using LdapViewer.Models
+@using LdapViewer.Services
+@inject LdapService LdapService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Open LDAP Viewer - Browser</PageTitle>
+
+@if (_reconnecting)
+{
+    <div class="container mt-4 text-center">
+        <span class="spinner-border me-2"></span> Verbindung wird wiederhergestellt...
+    </div>
+}
+else if (!LdapService.IsConnected)
+{
+    <div class="container mt-4">
+        <div class="alert alert-warning">
+            Nicht verbunden. <a href="/">Zur Verbindungsseite</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="ldap-browser">
+        <div class="ldap-tree-panel">
+            <div class="panel-header">
+                <strong>Verzeichnisbaum</strong>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="Disconnect" title="Trennen">
+                    Trennen
+                </button>
+            </div>
+            <div class="panel-toolbar d-flex gap-1">
+                <button class="btn btn-sm btn-outline-primary flex-grow-1" @onclick="ExpandAll" disabled="@_expanding">
+                    @if (_expanding)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Alle aufklappen
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ExportSubtreeLdif" disabled="@_exporting" title="Gesamten Baum als LDIF exportieren">
+                    @if (_exporting)
+                    {
+                        <span class="spinner-border spinner-border-sm"></span>
+                    }
+                    else
+                    {
+                        <span>LDIF</span>
+                    }
+                </button>
+            </div>
+
+            @if (_bookmarks.Count > 0)
+            {
+                <div class="bookmark-panel">
+                    <div class="bookmark-header d-flex align-items-center justify-content-between px-2 py-1">
+                        <small class="fw-bold">Lesezeichen (@_bookmarks.Count)</small>
+                        <button class="btn btn-sm btn-link p-0" @onclick="() => _bookmarksExpanded = !_bookmarksExpanded">
+                            @(_bookmarksExpanded ? "\u25BE" : "\u25B8")
+                        </button>
+                    </div>
+                    @if (_bookmarksExpanded)
+                    {
+                        @foreach (var bm in _bookmarks)
+                        {
+                            <div class="bookmark-item @(bm == _selectedDn ? "active" : "")"
+                                 @onclick="() => HandleTreeSelect(bm)">
+                                <span class="bookmark-label" title="@bm">@GetRdn(bm)</span>
+                                <button class="btn btn-sm btn-link p-0 bookmark-remove" @onclick:stopPropagation="true"
+                                        @onclick="() => ToggleBookmark(bm)">X</button>
+                            </div>
+                        }
+                    }
+                </div>
+            }
+
+            <div class="tree-content">
+                @if (_rootEntries == null)
+                {
+                    <div class="p-3">
+                        <span class="spinner-border spinner-border-sm me-2"></span> Lade...
+                    </div>
+                }
+                else if (_rootEntries.Count == 0)
+                {
+                    <div class="p-3 text-muted">Keine Eintraege gefunden.</div>
+                }
+                else
+                {
+                    @foreach (var entry in _rootEntries)
+                    {
+                        <LdapTree @key="entry.Dn"
+                                  @ref="_rootTreeRef"
+                                  Entry="entry"
+                                  LdapService="LdapService"
+                                  SelectedDn="@_selectedDn"
+                                  OnSelect="HandleTreeSelect"
+                                  AutoExpand="true" />
+                    }
+                }
+            </div>
+        </div>
+        <div class="ldap-detail-panel">
+            <div class="search-bar">
+                <div class="d-flex gap-1 mb-1">
+                    <select class="form-select form-select-sm" style="width: auto" @bind="_searchAttribute">
+                        <option value="">LDAP-Filter</option>
+                        <option value="cn">CN (Name)</option>
+                        <option value="uid">UID</option>
+                        <option value="sn">SN (Nachname)</option>
+                        <option value="givenName">Vorname</option>
+                        <option value="mail">Mail</option>
+                        <option value="objectClass">ObjectClass</option>
+                        <option value="ou">OU</option>
+                        <option value="telephoneNumber">Telefon</option>
+                        <option value="displayName">Anzeigename</option>
+                    </select>
+                    <div class="input-group input-group-sm flex-grow-1 search-history-dropdown">
+                        <input type="text" class="form-control"
+                               placeholder="@(_searchAttribute == "" ? "z.B. (cn=*Mueller*)" : "Suchbegriff (* als Platzhalter)")"
+                               @bind="_searchValue"
+                               @bind:event="oninput"
+                               @onkeydown="HandleSearchKey"
+                               @onfocus="() => _showSearchHistory = true"
+                               @onblur="HideSearchHistoryDelayed" />
+                        <button class="btn btn-primary" @onclick="ExecuteSearch" disabled="@_searching">
+                            @if (_searching)
+                            {
+                                <span class="spinner-border spinner-border-sm"></span>
+                            }
+                            else
+                            {
+                                <span>Suchen</span>
+                            }
+                        </button>
+                        @if (_searchResults != null)
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="ClearSearch">X</button>
+                        }
+                        @if (_showSearchHistory && _searchHistory.Count > 0)
+                        {
+                            <div class="search-history-list">
+                                @foreach (var item in _searchHistory)
+                                {
+                                    var histItem = item;
+                                    <div class="search-history-item" @onmousedown="() => ApplySearchHistory(histItem)">
+                                        <span>@(string.IsNullOrEmpty(histItem.Attribute) ? histItem.Value : $"{histItem.Attribute}={histItem.Value}")</span>
+                                        @if (!string.IsNullOrEmpty(histItem.Attribute))
+                                        {
+                                            <span class="badge bg-secondary">@histItem.Attribute</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-info">Filter</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(_searchError))
+                {
+                    <div class="text-danger small">@_searchError</div>
+                }
+            </div>
+
+            @if (_searchResults != null)
+            {
+                <div class="search-results-panel">
+                    <div class="search-results-list">
+                        <div class="small text-muted p-2 d-flex justify-content-between align-items-center">
+                            <span>@_searchResults.Count Ergebnis(se)</span>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="ExportSearchLdif" title="Ergebnisse als LDIF">LDIF</button>
+                        </div>
+                        @foreach (var result in _searchResults)
+                        {
+                            <div class="search-result-item @(result.Dn == _selectedDn ? "active" : "")"
+                                 @onclick="() => SelectSearchResult(result.Dn)">
+                                <div class="small fw-bold">@result.DisplayName</div>
+                                <div class="search-result-dn">@result.Dn</div>
+                            </div>
+                        }
+                    </div>
+                    <div class="search-detail">
+                        @if (_selectedEntry != null)
+                        {
+                            <LdapEntryDetail Entry="_selectedEntry"
+                                             OnBookmark="ToggleBookmark"
+                                             IsBookmarked="@_bookmarks.Contains(_selectedEntry.Dn)"
+                                             OnNavigate="HandleBreadcrumbNavigate" />
+                        }
+                        else
+                        {
+                            <div class="p-3 text-muted">Ergebnis anklicken fuer Details.</div>
+                        }
+                    </div>
+                </div>
+            }
+            else if (_selectedEntry != null)
+            {
+                <LdapEntryDetail Entry="_selectedEntry"
+                                 OnBookmark="ToggleBookmark"
+                                 IsBookmarked="@_bookmarks.Contains(_selectedEntry.Dn)"
+                                 OnNavigate="HandleBreadcrumbNavigate" />
+            }
+            else
+            {
+                <div class="p-4 text-muted">
+                    Eintrag im Baum auswaehlen, um Details anzuzeigen.
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<LdapEntry>? _rootEntries;
+    private string? _selectedDn;
+    private LdapEntry? _selectedEntry;
+    private LdapTree? _rootTreeRef;
+    private bool _expanding;
+    private bool _reconnecting;
+    private bool _exporting;
+
+    // Search
+    private string _searchAttribute = "";
+    private string _searchValue = "";
+    private List<LdapEntry>? _searchResults;
+    private string? _searchError;
+    private bool _searching;
+
+    // Search History
+    private List<SearchHistoryItem> _searchHistory = new();
+    private bool _showSearchHistory;
+
+    // Bookmarks
+    private List<string> _bookmarks = new();
+    private bool _bookmarksExpanded = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadBookmarks();
+            await LoadSearchHistory();
+
+            if (!LdapService.IsConnected)
+            {
+                await TryReconnect();
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (LdapService.IsConnected)
+        {
+            await LoadRootEntries();
+        }
+    }
+
+    // Search History
+    private async Task LoadSearchHistory()
+    {
+        try
+        {
+            var json = await JS.InvokeAsync<string>("searchHistoryStorage.load");
+            _searchHistory = JsonSerializer.Deserialize<List<SearchHistoryItem>>(json) ?? new();
+        }
+        catch
+        {
+            _searchHistory = new();
+        }
+    }
+
+    private async Task SaveSearchHistory()
+    {
+        var json = JsonSerializer.Serialize(_searchHistory);
+        await JS.InvokeVoidAsync("searchHistoryStorage.save", json);
+    }
+
+    private async Task AddToSearchHistory(string attribute, string value)
+    {
+        // Remove duplicate if exists
+        _searchHistory.RemoveAll(h => h.Attribute == attribute && h.Value == value);
+        // Insert at beginning
+        _searchHistory.Insert(0, new SearchHistoryItem { Attribute = attribute, Value = value });
+        // Keep max 20
+        if (_searchHistory.Count > 20)
+            _searchHistory = _searchHistory.Take(20).ToList();
+        await SaveSearchHistory();
+    }
+
+    private async Task ApplySearchHistory(SearchHistoryItem item)
+    {
+        _searchAttribute = item.Attribute;
+        _searchValue = item.Value;
+        _showSearchHistory = false;
+        await ExecuteSearch();
+    }
+
+    private async Task HideSearchHistoryDelayed()
+    {
+        await Task.Delay(200);
+        _showSearchHistory = false;
+    }
+
+    // Bookmarks
+    private async Task LoadBookmarks()
+    {
+        try
+        {
+            var json = await JS.InvokeAsync<string>("bookmarkStorage.load");
+            _bookmarks = JsonSerializer.Deserialize<List<string>>(json) ?? new();
+        }
+        catch
+        {
+            _bookmarks = new();
+        }
+    }
+
+    private async Task SaveBookmarks()
+    {
+        var json = JsonSerializer.Serialize(_bookmarks);
+        await JS.InvokeVoidAsync("bookmarkStorage.save", json);
+    }
+
+    private async Task ToggleBookmark(string dn)
+    {
+        if (_bookmarks.Contains(dn))
+            _bookmarks.Remove(dn);
+        else
+            _bookmarks.Add(dn);
+
+        await SaveBookmarks();
+    }
+
+    private static string GetRdn(string dn)
+    {
+        var idx = dn.IndexOf(',');
+        if (idx > 0)
+        {
+            var rdn = dn[..idx];
+            var eqIdx = rdn.IndexOf('=');
+            return eqIdx > 0 ? rdn[(eqIdx + 1)..] : rdn;
+        }
+        return dn;
+    }
+
+    private async Task TryReconnect()
+    {
+        try
+        {
+            var json = await JS.InvokeAsync<string>("connectionStorage.loadLastConnection");
+            if (string.IsNullOrEmpty(json)) return;
+
+            var settings = JsonSerializer.Deserialize<LdapConnectionSettings>(json);
+            if (settings == null) return;
+
+            _reconnecting = true;
+            StateHasChanged();
+
+            await Task.Run(() => LdapService.Connect(settings));
+            await LoadRootEntries();
+        }
+        catch
+        {
+            // Reconnect failed
+        }
+        finally
+        {
+            _reconnecting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadRootEntries()
+    {
+        try
+        {
+            var baseDn = LdapService.Settings!.BaseDn;
+            var baseEntry = await LdapService.GetEntry(baseDn);
+            if (baseEntry != null)
+            {
+                baseEntry.HasChildren = true;
+                _rootEntries = [baseEntry];
+            }
+            else
+            {
+                _rootEntries = [];
+            }
+        }
+        catch (Exception ex)
+        {
+            _rootEntries = [];
+            Console.Error.WriteLine($"Fehler beim Laden: {ex.Message}");
+        }
+    }
+
+    private async Task HandleTreeSelect(string dn)
+    {
+        _selectedDn = dn;
+        _searchResults = null;
+        _searchError = null;
+
+        try
+        {
+            _selectedEntry = await LdapService.GetEntry(dn);
+        }
+        catch (Exception ex)
+        {
+            _selectedEntry = null;
+            Console.Error.WriteLine($"Fehler beim Laden des Eintrags: {ex.Message}");
+        }
+    }
+
+    private async Task HandleBreadcrumbNavigate(string dn)
+    {
+        await HandleTreeSelect(dn);
+    }
+
+    private async Task SelectSearchResult(string dn)
+    {
+        _selectedDn = dn;
+
+        try
+        {
+            _selectedEntry = await LdapService.GetEntry(dn);
+        }
+        catch (Exception ex)
+        {
+            _selectedEntry = null;
+        }
+    }
+
+    private async Task HandleSearchKey(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ExecuteSearch();
+        }
+    }
+
+    private async Task ExecuteSearch()
+    {
+        if (string.IsNullOrWhiteSpace(_searchValue)) return;
+
+        _searching = true;
+        _searchError = null;
+        _searchResults = null;
+        _selectedEntry = null;
+        _selectedDn = null;
+        _showSearchHistory = false;
+        StateHasChanged();
+
+        try
+        {
+            string filter;
+            if (_searchAttribute == "")
+            {
+                // Raw LDAP filter
+                filter = _searchValue.Trim();
+                if (!filter.StartsWith("("))
+                    filter = $"({filter})";
+            }
+            else
+            {
+                // Attribute-based search
+                var val = _searchValue.Trim();
+                if (!val.Contains('*'))
+                    val = $"*{val}*";
+                filter = $"({_searchAttribute}={val})";
+            }
+
+            _searchResults = await LdapService.Search(LdapService.Settings!.BaseDn, filter);
+            await AddToSearchHistory(_searchAttribute, _searchValue.Trim());
+        }
+        catch (Exception ex)
+        {
+            _searchError = ex.Message;
+            _searchResults = null;
+        }
+        finally
+        {
+            _searching = false;
+        }
+    }
+
+    private void ClearSearch()
+    {
+        _searchResults = null;
+        _searchError = null;
+        _searchValue = "";
+    }
+
+    private async Task ExpandAll()
+    {
+        if (_rootTreeRef == null) return;
+        _expanding = true;
+        StateHasChanged();
+
+        try
+        {
+            await _rootTreeRef.ExpandAll();
+        }
+        finally
+        {
+            _expanding = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExportSubtreeLdif()
+    {
+        _exporting = true;
+        StateHasChanged();
+
+        try
+        {
+            var entries = await LdapService.GetSubtree(LdapService.Settings!.BaseDn);
+            var ldif = LdapService.ToLdif(entries);
+            await JS.InvokeVoidAsync("downloadFile", "export.ldif", ldif);
+        }
+        catch (Exception ex)
+        {
+            _searchError = $"LDIF Export Fehler: {ex.Message}";
+        }
+        finally
+        {
+            _exporting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExportSearchLdif()
+    {
+        if (_searchResults == null || _searchResults.Count == 0) return;
+
+        var ldif = LdapService.ToLdif(_searchResults);
+        await JS.InvokeVoidAsync("downloadFile", "search-results.ldif", ldif);
+    }
+
+    private async Task Disconnect()
+    {
+        LdapService.Disconnect();
+        await JS.InvokeVoidAsync("connectionStorage.clearLastConnection");
+        Navigation.NavigateTo("/");
+    }
+
+    private class SearchHistoryItem
+    {
+        public string Attribute { get; set; } = "";
+        public string Value { get; set; } = "";
+    }
+}

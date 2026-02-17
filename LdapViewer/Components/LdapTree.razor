@@ -1,0 +1,173 @@
+@using LdapViewer.Models
+@using LdapViewer.Services
+
+<div class="tree-node">
+    <div class="tree-node-row @(_isSelected ? "selected" : "")" @onclick="HandleRowClick">
+        @if (_isLeaf)
+        {
+            <span class="tree-toggle-placeholder"></span>
+        }
+        else
+        {
+            <span class="tree-toggle">
+                @(_expanded ? "\u25BE" : "\u25B8")
+            </span>
+        }
+        <span class="tree-label" title="@Entry.Dn">
+            @Entry.DisplayName
+            @if (_childCount > 0)
+            {
+                <span class="tree-child-count">(@_childCount)</span>
+            }
+        </span>
+    </div>
+
+    @if (_expanded && _children != null && _children.Count > 0)
+    {
+        <div class="tree-children">
+            @foreach (var child in _children)
+            {
+                <LdapTree @key="child.Dn"
+                          @ref="_childRefs[child.Dn]"
+                          Entry="child"
+                          LdapService="LdapService"
+                          SelectedDn="@SelectedDn"
+                          OnSelect="OnSelect" />
+            }
+        </div>
+    }
+    else if (_expanded && _loading)
+    {
+        <div class="tree-children">
+            <div class="tree-loading">
+                <span class="spinner-border spinner-border-sm"></span> Lade...
+            </div>
+        </div>
+    }
+    else if (_expanded && _error != null)
+    {
+        <div class="tree-children">
+            <div class="tree-error text-danger">@_error</div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public LdapEntry Entry { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public LdapService LdapService { get; set; } = default!;
+
+    [Parameter]
+    public string? SelectedDn { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnSelect { get; set; }
+
+    [Parameter]
+    public bool AutoExpand { get; set; }
+
+    private bool _expanded;
+    private bool _loading;
+    private bool _isLeaf;
+    private string? _error;
+    private int _childCount;
+    private List<LdapEntry>? _children;
+    private Dictionary<string, LdapTree> _childRefs = new();
+    private bool _isSelected => SelectedDn == Entry.Dn;
+    private bool _countLoaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AutoExpand)
+        {
+            await Expand();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_countLoaded && !_isLeaf)
+        {
+            _countLoaded = true;
+            try
+            {
+                _childCount = await LdapService.GetChildCount(Entry.Dn);
+                if (_childCount == 0)
+                    _isLeaf = true;
+                StateHasChanged();
+            }
+            catch { }
+        }
+    }
+
+    private async Task HandleRowClick()
+    {
+        await OnSelect.InvokeAsync(Entry.Dn);
+
+        if (_isLeaf) return;
+
+        if (!_expanded)
+        {
+            await Expand();
+        }
+        else
+        {
+            _expanded = false;
+        }
+    }
+
+    public async Task ExpandAll()
+    {
+        await Expand();
+
+        if (_children == null) return;
+
+        StateHasChanged();
+        await Task.Delay(1); // let child refs register
+
+        foreach (var childRef in _childRefs.Values)
+        {
+            if (childRef != null)
+            {
+                await childRef.ExpandAll();
+            }
+        }
+    }
+
+    private async Task Expand()
+    {
+        if (_isLeaf) return;
+
+        _expanded = true;
+
+        if (_children == null)
+        {
+            _loading = true;
+            _error = null;
+            StateHasChanged();
+
+            try
+            {
+                _children = await LdapService.GetChildren(Entry.Dn);
+                _childCount = _children.Count;
+                _countLoaded = true;
+                if (_children.Count == 0)
+                {
+                    _isLeaf = true;
+                    _expanded = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _children = [];
+                _error = ex.Message;
+            }
+            finally
+            {
+                _loading = false;
+            }
+        }
+    }
+}

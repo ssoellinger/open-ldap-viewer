@@ -1,0 +1,152 @@
+@page "/schema"
+@using LdapViewer.Models
+@using LdapViewer.Services
+@inject LdapService LdapService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Open LDAP Viewer - Schema</PageTitle>
+
+@if (!LdapService.IsConnected)
+{
+    <div class="container mt-4">
+        <div class="alert alert-warning">
+            Nicht verbunden. <a href="/">Zur Verbindungsseite</a>
+        </div>
+    </div>
+}
+else if (_loading)
+{
+    <div class="container mt-4 text-center">
+        <span class="spinner-border me-2"></span> Schema wird geladen...
+    </div>
+}
+else if (_error != null)
+{
+    <div class="container mt-4">
+        <div class="alert alert-danger">Fehler: @_error</div>
+    </div>
+}
+else if (_schema != null)
+{
+    <div class="container-fluid mt-3">
+        <div class="d-flex gap-2 mb-3">
+            <div class="input-group input-group-sm" style="max-width: 400px">
+                <input type="text" class="form-control" placeholder="Schema durchsuchen..."
+                       @bind="_filter" @bind:event="oninput" />
+                @if (!string.IsNullOrEmpty(_filter))
+                {
+                    <button class="btn btn-outline-secondary" @onclick="() => _filter = string.Empty">X</button>
+                }
+            </div>
+        </div>
+
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <button class="nav-link @(_tab == "objectClasses" ? "active" : "")"
+                        @onclick="ShowObjectClasses">
+                    Object Classes (@FilteredObjectClasses.Count())
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(_tab == "attributeTypes" ? "active" : "")"
+                        @onclick="ShowAttributeTypes">
+                    Attribute Types (@FilteredAttributeTypes.Count())
+                </button>
+            </li>
+        </ul>
+
+        <div class="schema-list">
+            @if (_tab == "objectClasses")
+            {
+                @foreach (var item in FilteredObjectClasses)
+                {
+                    <div class="schema-item @(_selectedItem == item ? "active" : "")" @onclick="() => _selectedItem = item">
+                        <div class="fw-bold">@item.Name</div>
+                        @if (!string.IsNullOrEmpty(item.Oid))
+                        {
+                            <span class="text-muted small">@item.Oid</span>
+                        }
+                        @if (!string.IsNullOrEmpty(item.Description))
+                        {
+                            <div class="small text-muted">@item.Description</div>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                @foreach (var item in FilteredAttributeTypes)
+                {
+                    <div class="schema-item @(_selectedItem == item ? "active" : "")" @onclick="() => _selectedItem = item">
+                        <div class="fw-bold">@item.Name</div>
+                        @if (!string.IsNullOrEmpty(item.Oid))
+                        {
+                            <span class="text-muted small">@item.Oid</span>
+                        }
+                        @if (!string.IsNullOrEmpty(item.Description))
+                        {
+                            <div class="small text-muted">@item.Description</div>
+                        }
+                    </div>
+                }
+            }
+        </div>
+
+        @if (_selectedItem != null)
+        {
+            <div class="schema-definition mt-3">
+                <h6>Definition: @_selectedItem.Name</h6>
+                <pre class="bg-light p-3 border rounded" style="white-space: pre-wrap; word-break: break-all; font-size: 0.85rem;">@_selectedItem.Definition</pre>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private LdapSchema? _schema;
+    private bool _loading;
+    private string? _error;
+    private string _tab = "objectClasses";
+    private string _filter = string.Empty;
+    private SchemaItem? _selectedItem;
+
+    private void ShowObjectClasses() { _tab = "objectClasses"; _selectedItem = null; }
+    private void ShowAttributeTypes() { _tab = "attributeTypes"; _selectedItem = null; }
+
+    private IEnumerable<SchemaItem> FilteredObjectClasses =>
+        string.IsNullOrWhiteSpace(_filter)
+            ? _schema?.ObjectClasses ?? []
+            : (_schema?.ObjectClasses ?? []).Where(i =>
+                i.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase) ||
+                (i.Description?.Contains(_filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (i.Oid?.Contains(_filter, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    private IEnumerable<SchemaItem> FilteredAttributeTypes =>
+        string.IsNullOrWhiteSpace(_filter)
+            ? _schema?.AttributeTypes ?? []
+            : (_schema?.AttributeTypes ?? []).Where(i =>
+                i.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase) ||
+                (i.Description?.Contains(_filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (i.Oid?.Contains(_filter, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!LdapService.IsConnected) return;
+
+        _loading = true;
+        try
+        {
+            _schema = await LdapService.GetSchema();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

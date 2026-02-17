@@ -1,0 +1,210 @@
+@using LdapViewer.Models
+@using LdapViewer.Services
+@inject IJSRuntime JS
+
+<div class="entry-detail">
+    <div class="d-flex align-items-start justify-content-between mb-2">
+        <div class="dn-breadcrumb mb-0">
+            @{ var segments = ParseDnSegments(Entry.Dn); }
+            @for (int i = 0; i < segments.Count; i++)
+            {
+                var segment = segments[i];
+                var dn = BuildDnFromIndex(segments, i);
+                @if (i > 0)
+                {
+                    <span class="dn-breadcrumb-separator">&gt;</span>
+                }
+                <span class="dn-breadcrumb-segment" @onclick="() => NavigateToDn(dn)" title="@dn">@segment</span>
+            }
+        </div>
+        <div class="d-flex gap-1 flex-shrink-0 ms-2">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="CopyDn" title="DN kopieren">
+                @(_copied == "dn" ? "Kopiert!" : "DN kopieren")
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="ExportLdif" title="Als LDIF exportieren">
+                LDIF
+            </button>
+            @if (OnBookmark.HasDelegate)
+            {
+                <button class="btn btn-sm @(IsBookmarked ? "btn-warning" : "btn-outline-warning")" @onclick="() => OnBookmark.InvokeAsync(Entry.Dn)" title="@(IsBookmarked ? "Lesezeichen entfernen" : "Lesezeichen setzen")">
+                    @(IsBookmarked ? "\u2605" : "\u2606")
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (Entry.Attributes.Count == 0)
+    {
+        <p class="text-muted">Keine Attribute vorhanden.</p>
+    }
+    else
+    {
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr>
+                    <th style="width: 30%">Attribut</th>
+                    <th>Wert(e)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var attr in Entry.Attributes.OrderBy(a => a.Key))
+                {
+                    <tr>
+                        <td class="attr-name">@attr.Key</td>
+                        <td class="attr-value">
+                            @if (attr.Value.Count == 1)
+                            {
+                                @if (IsMemberAttribute(attr.Key) && LooksLikeDn(attr.Value[0]))
+                                {
+                                    var memberDn = attr.Value[0];
+                                    <span class="member-link" @onclick="() => NavigateToDn(memberDn)" title="Zum Eintrag navigieren">@memberDn</span>
+                                }
+                                else
+                                {
+                                    <span class="attr-value-text" @onclick="() => CopyValue(attr.Value[0])" title="Klicken zum Kopieren">@attr.Value[0]</span>
+                                    @if (_copied == $"{attr.Key}:0")
+                                    {
+                                        <span class="text-success small ms-1">Kopiert!</span>
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                <ul class="mb-0 ps-3">
+                                    @{ var idx = 0; }
+                                    @foreach (var val in attr.Value)
+                                    {
+                                        var copyKey = $"{attr.Key}:{idx}";
+                                        var valCopy = val;
+                                        <li>
+                                            @if (IsMemberAttribute(attr.Key) && LooksLikeDn(valCopy))
+                                            {
+                                                <span class="member-link" @onclick="() => NavigateToDn(valCopy)" title="Zum Eintrag navigieren">@valCopy</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="attr-value-text" @onclick="() => CopyValue(valCopy, copyKey)" title="Klicken zum Kopieren">@val</span>
+                                                @if (_copied == copyKey)
+                                                {
+                                                    <span class="text-success small ms-1">Kopiert!</span>
+                                                }
+                                            }
+                                        </li>
+                                        idx++;
+                                    }
+                                </ul>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public LdapEntry Entry { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<string> OnBookmark { get; set; }
+
+    [Parameter]
+    public bool IsBookmarked { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnNavigate { get; set; }
+
+    private string? _copied;
+
+    private static readonly HashSet<string> MemberAttributes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "member", "uniqueMember", "memberUid", "owner", "seeAlso", "memberOf"
+    };
+
+    private static bool IsMemberAttribute(string attrName)
+    {
+        return MemberAttributes.Contains(attrName);
+    }
+
+    private static bool LooksLikeDn(string value)
+    {
+        return value.Contains('=') && value.Contains(',');
+    }
+
+    private static List<string> ParseDnSegments(string dn)
+    {
+        var segments = new List<string>();
+        var current = new System.Text.StringBuilder();
+        bool escaped = false;
+
+        foreach (var c in dn)
+        {
+            if (escaped)
+            {
+                current.Append(c);
+                escaped = false;
+                continue;
+            }
+            if (c == '\\')
+            {
+                current.Append(c);
+                escaped = true;
+                continue;
+            }
+            if (c == ',')
+            {
+                if (current.Length > 0)
+                {
+                    segments.Add(current.ToString().Trim());
+                    current.Clear();
+                }
+                continue;
+            }
+            current.Append(c);
+        }
+
+        if (current.Length > 0)
+            segments.Add(current.ToString().Trim());
+
+        return segments;
+    }
+
+    private static string BuildDnFromIndex(List<string> segments, int startIndex)
+    {
+        return string.Join(",", segments.Skip(startIndex));
+    }
+
+    private async Task NavigateToDn(string dn)
+    {
+        if (OnNavigate.HasDelegate)
+        {
+            await OnNavigate.InvokeAsync(dn);
+        }
+    }
+
+    private async Task CopyDn()
+    {
+        await JS.InvokeVoidAsync("clipboardCopy", Entry.Dn);
+        _copied = "dn";
+        StateHasChanged();
+        await Task.Delay(1500);
+        _copied = null;
+    }
+
+    private async Task CopyValue(string value, string? key = null)
+    {
+        await JS.InvokeVoidAsync("clipboardCopy", value);
+        _copied = key ?? $"{value.GetHashCode()}";
+        StateHasChanged();
+        await Task.Delay(1500);
+        _copied = null;
+    }
+
+    private async Task ExportLdif()
+    {
+        var ldif = LdapService.ToLdif(Entry);
+        var filename = $"{Entry.DisplayName}.ldif";
+        await JS.InvokeVoidAsync("downloadFile", filename, ldif);
+    }
+}

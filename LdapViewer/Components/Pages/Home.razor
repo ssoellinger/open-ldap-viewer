@@ -1,0 +1,342 @@
+@page "/"
+@using System.Text.Json
+@using LdapViewer.Models
+@using LdapViewer.Services
+@inject LdapService LdapService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Open LDAP Viewer - Verbindung</PageTitle>
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+
+            @if (_savedConnections.Count > 0)
+            {
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">Gespeicherte Verbindungen</h5>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        @foreach (var conn in _savedConnections)
+                        {
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <a href="#" class="text-decoration-none flex-grow-1"
+                                   @onclick="() => LoadConnection(conn)"
+                                   @ondblclick="() => QuickConnect(conn)"
+                                   @onclick:preventDefault
+                                   @ondblclick:preventDefault>
+                                    <strong>@conn.Name</strong>
+                                    <small class="text-muted ms-2">@conn.Server:@conn.Port - @conn.BaseDn</small>
+                                </a>
+                                <button class="btn btn-sm btn-outline-danger ms-2" @onclick="() => DeleteConnection(conn)" title="Loeschen">
+                                    X
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">LDAP-Verbindung</h4>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="@_settings" OnValidSubmit="HandleConnect" FormName="ldapConnect">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label class="form-label">Server</label>
+                            <InputText class="form-control" @bind-Value="_settings.Server" placeholder="ldap.example.com" />
+                            <ValidationMessage For="@(() => _settings.Server)" />
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-8">
+                                <label class="form-label">Port</label>
+                                <InputNumber class="form-control" @bind-Value="_settings.Port" />
+                                <ValidationMessage For="@(() => _settings.Port)" />
+                            </div>
+                            <div class="col-4 d-flex align-items-end">
+                                <div class="form-check form-switch mb-2">
+                                    <InputCheckbox class="form-check-input" @bind-Value="_settings.UseSsl" id="sslToggle" />
+                                    <label class="form-check-label" for="sslToggle">SSL/TLS</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Base DN</label>
+                            <InputText class="form-control" @bind-Value="_settings.BaseDn" placeholder="dc=example,dc=com" />
+                            <ValidationMessage For="@(() => _settings.BaseDn)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Benutzername (optional)</label>
+                            <InputText class="form-control" @bind-Value="_settings.Username" placeholder="cn=admin,dc=example,dc=com" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Passwort (optional)</label>
+                            <InputText class="form-control" type="password" @bind-Value="_settings.Password" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(_errorMessage))
+                        {
+                            <div class="alert alert-danger">@_errorMessage</div>
+                        }
+
+                        @if (_testSuccess)
+                        {
+                            <div class="alert alert-success">Verbindung erfolgreich!</div>
+                        }
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary flex-grow-1" disabled="@_connecting">
+                                @if (_connecting)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Verbinden
+                            </button>
+                            <button type="button" class="btn btn-outline-info" @onclick="TestConnection" disabled="@_testing">
+                                @if (_testing)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Testen
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="SaveConnection">
+                                Speichern
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+
+            @if (LdapService.IsConnected)
+            {
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">Passwort pruefen</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">Pruefen Sie, ob ein LDAP-Bind mit einem bestimmten Benutzer und Passwort erfolgreich ist.</p>
+                        <div class="mb-3">
+                            <label class="form-label">Benutzer-DN</label>
+                            <input type="text" class="form-control" @bind="_testUserDn" placeholder="cn=user,ou=People,dc=example,dc=com" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Passwort</label>
+                            <input type="password" class="form-control" @bind="_testUserPassword" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(_testBindError))
+                        {
+                            <div class="alert alert-danger">@_testBindError</div>
+                        }
+
+                        @if (_testBindSuccess)
+                        {
+                            <div class="alert alert-success">Bind erfolgreich! Benutzer und Passwort sind korrekt.</div>
+                        }
+
+                        <button class="btn btn-outline-primary" @onclick="TestUserBind" disabled="@_testingBind">
+                            @if (_testingBind)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            Pruefen
+                        </button>
+                    </div>
+                </div>
+            }
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private LdapConnectionSettings _settings = new();
+    private List<LdapConnectionSettings> _savedConnections = new();
+    private string? _errorMessage;
+    private bool _connecting;
+    private bool _testing;
+    private bool _testSuccess;
+
+    // Password check
+    private string _testUserDn = "";
+    private string _testUserPassword = "";
+    private string? _testBindError;
+    private bool _testBindSuccess;
+    private bool _testingBind;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadSavedConnections();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadSavedConnections()
+    {
+        try
+        {
+            var json = await JS.InvokeAsync<string>("connectionStorage.load");
+            _savedConnections = JsonSerializer.Deserialize<List<LdapConnectionSettings>>(json) ?? [];
+        }
+        catch
+        {
+            _savedConnections = [];
+        }
+    }
+
+    private async Task PersistConnections()
+    {
+        var json = JsonSerializer.Serialize(_savedConnections);
+        await JS.InvokeVoidAsync("connectionStorage.save", json);
+    }
+
+    private async Task SaveConnection()
+    {
+        if (string.IsNullOrWhiteSpace(_settings.Server))
+        {
+            _errorMessage = "Server muss ausgefuellt sein um zu speichern.";
+            return;
+        }
+
+        var name = _settings.Name;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = $"{_settings.Server}:{_settings.Port}";
+        }
+
+        // Remove existing with same name
+        _savedConnections.RemoveAll(c => c.Name == name);
+
+        _savedConnections.Add(new LdapConnectionSettings
+        {
+            Name = name,
+            Server = _settings.Server,
+            Port = _settings.Port,
+            BaseDn = _settings.BaseDn,
+            Username = _settings.Username,
+            Password = _settings.Password,
+            UseSsl = _settings.UseSsl
+        });
+
+        await PersistConnections();
+        _errorMessage = null;
+    }
+
+    private void LoadConnection(LdapConnectionSettings conn)
+    {
+        _settings.Name = conn.Name;
+        _settings.Server = conn.Server;
+        _settings.Port = conn.Port;
+        _settings.BaseDn = conn.BaseDn;
+        _settings.Username = conn.Username;
+        _settings.Password = conn.Password;
+        _settings.UseSsl = conn.UseSsl;
+        _errorMessage = null;
+    }
+
+    private async Task QuickConnect(LdapConnectionSettings conn)
+    {
+        LoadConnection(conn);
+        await HandleConnect();
+    }
+
+    private async Task DeleteConnection(LdapConnectionSettings conn)
+    {
+        _savedConnections.Remove(conn);
+        await PersistConnections();
+    }
+
+    private async Task TestConnection()
+    {
+        _errorMessage = null;
+        _testSuccess = false;
+        _testing = true;
+        StateHasChanged();
+
+        try
+        {
+            var testService = new LdapService();
+            try
+            {
+                await Task.Run(() => testService.Connect(_settings));
+                _testSuccess = true;
+            }
+            finally
+            {
+                testService.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Verbindung fehlgeschlagen: {ex.Message}";
+        }
+        finally
+        {
+            _testing = false;
+        }
+    }
+
+    private async Task HandleConnect()
+    {
+        _errorMessage = null;
+        _connecting = true;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Run(() => LdapService.Connect(_settings));
+            await SaveConnection();
+            await JS.InvokeVoidAsync("connectionStorage.saveLastConnection",
+                JsonSerializer.Serialize(_settings));
+            Navigation.NavigateTo("/browser");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Verbindung fehlgeschlagen: {ex.Message}";
+        }
+        finally
+        {
+            _connecting = false;
+        }
+    }
+
+    private async Task TestUserBind()
+    {
+        if (string.IsNullOrWhiteSpace(_testUserDn) || string.IsNullOrWhiteSpace(_testUserPassword))
+        {
+            _testBindError = "Benutzer-DN und Passwort muessen ausgefuellt sein.";
+            return;
+        }
+
+        _testingBind = true;
+        _testBindError = null;
+        _testBindSuccess = false;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Run(() => LdapService.TestBind(_testUserDn, _testUserPassword));
+            _testBindSuccess = true;
+        }
+        catch (Exception ex)
+        {
+            _testBindError = $"Bind fehlgeschlagen: {ex.Message}";
+        }
+        finally
+        {
+            _testingBind = false;
+        }
+    }
+}

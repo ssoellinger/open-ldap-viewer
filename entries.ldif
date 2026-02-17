@@ -1,0 +1,99 @@
+dn: ou=People,dc=example,dc=com
+objectClass: organizationalUnit
+ou: People
+
+dn: ou=Groups,dc=example,dc=com
+objectClass: organizationalUnit
+ou: Groups
+
+dn: ou=IT,ou=People,dc=example,dc=com
+objectClass: organizationalUnit
+ou: IT
+
+dn: ou=HR,ou=People,dc=example,dc=com
+objectClass: organizationalUnit
+ou: HR
+
+dn: uid=mmueller,ou=IT,ou=People,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: mmueller
+sn: Mueller
+givenName: Max
+cn: Max Mueller
+displayName: Max Mueller
+uidNumber: 1001
+gidNumber: 1001
+homeDirectory: /home/mmueller
+loginShell: /bin/bash
+mail: max.mueller@example.com
+telephoneNumber: +49 30 12345678
+
+dn: uid=aschmidt,ou=IT,ou=People,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: aschmidt
+sn: Schmidt
+givenName: Anna
+cn: Anna Schmidt
+displayName: Anna Schmidt
+uidNumber: 1002
+gidNumber: 1001
+homeDirectory: /home/aschmidt
+loginShell: /bin/bash
+mail: anna.schmidt@example.com
+telephoneNumber: +49 30 87654321
+
+dn: uid=tweber,ou=HR,ou=People,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: tweber
+sn: Weber
+givenName: Thomas
+cn: Thomas Weber
+displayName: Thomas Weber
+uidNumber: 1003
+gidNumber: 1002
+homeDirectory: /home/tweber
+loginShell: /bin/bash
+mail: thomas.weber@example.com
+telephoneNumber: +49 40 11223344
+
+dn: uid=lfischer,ou=HR,ou=People,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: lfischer
+sn: Fischer
+givenName: Laura
+cn: Laura Fischer
+displayName: Laura Fischer
+uidNumber: 1004
+gidNumber: 1002
+homeDirectory: /home/lfischer
+loginShell: /bin/bash
+mail: laura.fischer@example.com
+telephoneNumber: +49 40 55667788
+
+dn: cn=developers,ou=Groups,dc=example,dc=com
+objectClass: posixGroup
+cn: developers
+gidNumber: 1001
+memberUid: mmueller
+memberUid: aschmidt
+
+dn: cn=hr-team,ou=Groups,dc=example,dc=com
+objectClass: posixGroup
+cn: hr-team
+gidNumber: 1002
+memberUid: tweber
+memberUid: lfischer
+
+dn: cn=admins,ou=Groups,dc=example,dc=com
+objectClass: posixGroup
+cn: admins
+gidNumber: 1003
+memberUid: mmueller
