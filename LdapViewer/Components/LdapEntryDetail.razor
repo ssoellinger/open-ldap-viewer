@@ -17,11 +17,26 @@
                 <span class="dn-breadcrumb-segment" @onclick="() => NavigateToDn(dn)" title="@dn">@segment</span>
             }
         </div>
-        <div class="d-flex gap-1 flex-shrink-0 ms-2">
+        <div class="d-flex gap-1 flex-shrink-0 ms-2 flex-wrap justify-content-end">
             @if (!_editMode)
             {
                 <button class="btn btn-sm btn-outline-primary" @onclick="EnterEditMode" title="Bearbeiten">
                     Bearbeiten
+                </button>
+                @if (HasPasswordAttribute())
+                {
+                    <button class="btn btn-sm @(_showPasswordTool ? "btn-info" : "btn-outline-info")" @onclick="() => ToggleTool(ref _showPasswordTool)" title="Passwort aendern">
+                        Passwort
+                    </button>
+                }
+                @if (IsGroupEntry())
+                {
+                    <button class="btn btn-sm @(_showGroupManager ? "btn-success" : "btn-outline-success")" @onclick="() => ToggleTool(ref _showGroupManager)" title="Mitglieder verwalten">
+                        Mitglieder
+                    </button>
+                }
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleTool(ref _showMoveTool)" title="Verschieben/Umbenennen">
+                    Verschieben
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="CopyDn" title="DN kopieren">
                     @(_copied == "dn" ? "Kopiert!" : "DN kopieren")
@@ -78,6 +93,57 @@
     @if (!string.IsNullOrEmpty(_success))
     {
         <div class="alert alert-success alert-sm py-1 px-2 small">@_success</div>
+    }
+
+    @* Password Tool *@
+    @if (_showPasswordTool)
+    {
+        <div class="mb-3">
+            <PasswordTool Dn="@Entry.Dn" LdapService="LdapService"
+                          OnClose="() => _showPasswordTool = false"
+                          OnChanged="HandleToolChanged" />
+        </div>
+    }
+
+    @* Group Member Manager *@
+    @if (_showGroupManager)
+    {
+        <div class="mb-3">
+            <GroupMemberManager Entry="Entry" LdapService="LdapService"
+                                OnClose="() => _showGroupManager = false"
+                                OnChanged="HandleToolChanged"
+                                OnNavigate="OnNavigate" />
+        </div>
+    }
+
+    @* Move/Rename Tool *@
+    @if (_showMoveTool)
+    {
+        <div class="tool-panel mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <strong class="small">Verschieben / Umbenennen</strong>
+                <button class="btn btn-sm btn-outline-secondary py-0 px-1" @onclick="() => _showMoveTool = false">X</button>
+            </div>
+            <div class="mb-2">
+                <label class="form-label small mb-0">Neuer RDN</label>
+                <input type="text" class="form-control form-control-sm" @bind="_moveNewRdn" placeholder="@GetCurrentRdn()" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label small mb-0">Neuer Parent DN (leer = gleicher Ort)</label>
+                <input type="text" class="form-control form-control-sm" @bind="_moveNewParent" placeholder="@GetCurrentParent()" />
+            </div>
+            @if (!string.IsNullOrEmpty(_moveError))
+            {
+                <div class="alert alert-danger small py-1 px-2">@_moveError</div>
+            }
+            <button class="btn btn-sm btn-primary" @onclick="ExecuteMove" disabled="@_moving">
+                @if (_moving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Verschieben
+            </button>
+        </div>
     }
 
     @if (Entry.Attributes.Count == 0)
@@ -222,6 +288,9 @@
     [Parameter]
     public EventCallback<LdapEntry> OnCopy { get; set; }
 
+    [Parameter]
+    public EventCallback<string> OnMoved { get; set; }
+
     private string? _copied;
     private bool _editMode;
     private bool _saving;
@@ -231,24 +300,126 @@
     private string _newAttrName = "";
     private string _newAttrValue = "";
 
-    // Edit state: deep copy of attributes
+    // Edit state
     private Dictionary<string, List<string>> _editAttributes = new();
     private Dictionary<string, List<string>> _originalAttributes = new();
     private string[]? _schemaAttributes;
+
+    // Tool panels
+    private bool _showPasswordTool;
+    private bool _showGroupManager;
+    private bool _showMoveTool;
+    private string _moveNewRdn = "";
+    private string _moveNewParent = "";
+    private string? _moveError;
+    private bool _moving;
 
     private static readonly HashSet<string> MemberAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
         "member", "uniqueMember", "memberUid", "owner", "seeAlso", "memberOf"
     };
 
-    private static bool IsMemberAttribute(string attrName)
+    private static readonly HashSet<string> GroupObjectClasses = new(StringComparer.OrdinalIgnoreCase)
     {
-        return MemberAttributes.Contains(attrName);
+        "groupOfNames", "groupOfUniqueNames", "posixGroup", "group"
+    };
+
+    private static bool IsMemberAttribute(string attrName) => MemberAttributes.Contains(attrName);
+
+    private static bool LooksLikeDn(string value) => value.Contains('=') && value.Contains(',');
+
+    private bool HasPasswordAttribute()
+    {
+        return Entry.Attributes.Any(a =>
+            a.Key.Equals("userPassword", StringComparison.OrdinalIgnoreCase) ||
+            a.Key.Equals("objectClass", StringComparison.OrdinalIgnoreCase) &&
+            a.Value.Any(v => v.Equals("inetOrgPerson", StringComparison.OrdinalIgnoreCase) ||
+                             v.Equals("person", StringComparison.OrdinalIgnoreCase) ||
+                             v.Equals("posixAccount", StringComparison.OrdinalIgnoreCase) ||
+                             v.Equals("account", StringComparison.OrdinalIgnoreCase)));
     }
 
-    private static bool LooksLikeDn(string value)
+    private bool IsGroupEntry()
     {
-        return value.Contains('=') && value.Contains(',');
+        return Entry.Attributes
+            .Where(a => a.Key.Equals("objectClass", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(a => a.Value)
+            .Any(v => GroupObjectClasses.Contains(v));
+    }
+
+    private void ToggleTool(ref bool tool)
+    {
+        var newState = !tool;
+        _showPasswordTool = false;
+        _showGroupManager = false;
+        _showMoveTool = false;
+        tool = newState;
+    }
+
+    private string GetCurrentRdn()
+    {
+        var idx = Entry.Dn.IndexOf(',');
+        return idx > 0 ? Entry.Dn[..idx] : Entry.Dn;
+    }
+
+    private string GetCurrentParent()
+    {
+        var idx = Entry.Dn.IndexOf(',');
+        return idx > 0 ? Entry.Dn[(idx + 1)..] : "";
+    }
+
+    // Move/Rename
+    private async Task ExecuteMove()
+    {
+        _moveError = null;
+        var newRdn = string.IsNullOrWhiteSpace(_moveNewRdn) ? GetCurrentRdn() : _moveNewRdn.Trim();
+        var newParent = string.IsNullOrWhiteSpace(_moveNewParent) ? null : _moveNewParent.Trim();
+
+        // Nothing changed
+        if (newRdn == GetCurrentRdn() && newParent == null)
+        {
+            _moveError = "Keine Aenderung angegeben.";
+            return;
+        }
+
+        _moving = true;
+        StateHasChanged();
+
+        try
+        {
+            await LdapService.MoveEntry(Entry.Dn, newRdn, newParent);
+            var newDn = newParent != null ? $"{newRdn},{newParent}" : $"{newRdn},{GetCurrentParent()}";
+            _showMoveTool = false;
+            _moveNewRdn = "";
+            _moveNewParent = "";
+
+            if (OnMoved.HasDelegate)
+                await OnMoved.InvokeAsync(newDn);
+        }
+        catch (Exception ex)
+        {
+            _moveError = $"Fehler: {ex.Message}";
+        }
+        finally
+        {
+            _moving = false;
+        }
+    }
+
+    private async Task HandleToolChanged()
+    {
+        // Reload entry after tool changes
+        try
+        {
+            var updated = await LdapService.GetEntry(Entry.Dn);
+            if (updated != null)
+            {
+                Entry = updated;
+                if (OnModified.HasDelegate)
+                    await OnModified.InvokeAsync(updated);
+            }
+        }
+        catch { }
     }
 
     // Edit Mode
@@ -257,6 +428,9 @@
         _editMode = true;
         _error = null;
         _success = null;
+        _showPasswordTool = false;
+        _showGroupManager = false;
+        _showMoveTool = false;
         _editAttributes = Entry.Attributes.ToDictionary(
             a => a.Key,
             a => new List<string>(a.Value));
@@ -264,7 +438,6 @@
             a => a.Key,
             a => new List<string>(a.Value));
 
-        // Load allowed attributes for this entry's objectClasses
         try
         {
             var schema = await LdapService.GetSchema();
@@ -301,9 +474,7 @@
     private void UpdateEditValue(string attrName, int index, string newValue)
     {
         if (_editAttributes.TryGetValue(attrName, out var values) && index < values.Count)
-        {
             values[index] = newValue;
-        }
     }
 
     private void RemoveEditValue(string attrName, int index)
@@ -312,35 +483,26 @@
         {
             values.RemoveAt(index);
             if (values.Count == 0)
-            {
                 _editAttributes.Remove(attrName);
-            }
         }
     }
 
     private void AddEditValue(string attrName)
     {
         if (_editAttributes.TryGetValue(attrName, out var values))
-        {
             values.Add("");
-        }
     }
 
     private void AddNewAttribute()
     {
         if (string.IsNullOrWhiteSpace(_newAttrName)) return;
-
         var name = _newAttrName.Trim();
         var value = _newAttrValue.Trim();
 
         if (_editAttributes.ContainsKey(name))
-        {
             _editAttributes[name].Add(value);
-        }
         else
-        {
             _editAttributes[name] = new List<string> { value };
-        }
 
         _newAttrName = "";
         _newAttrValue = "";
@@ -364,8 +526,6 @@
             }
 
             await LdapService.ModifyEntry(Entry.Dn, modifications);
-
-            // Reload the entry
             var updated = await LdapService.GetEntry(Entry.Dn);
             if (updated != null)
             {
@@ -391,61 +551,31 @@
     {
         var mods = new List<LdapModification>();
 
-        // Find deleted attributes
         foreach (var orig in _originalAttributes)
         {
             if (!_editAttributes.ContainsKey(orig.Key))
-            {
-                mods.Add(new LdapModification
-                {
-                    AttributeName = orig.Key,
-                    Type = LdapModificationType.Delete
-                });
-            }
+                mods.Add(new LdapModification { AttributeName = orig.Key, Type = LdapModificationType.Delete });
         }
 
-        // Find added/modified attributes
         foreach (var edit in _editAttributes)
         {
             var values = edit.Value.Where(v => !string.IsNullOrEmpty(v)).ToList();
             if (values.Count == 0)
             {
                 if (_originalAttributes.ContainsKey(edit.Key))
-                {
-                    mods.Add(new LdapModification
-                    {
-                        AttributeName = edit.Key,
-                        Type = LdapModificationType.Delete
-                    });
-                }
+                    mods.Add(new LdapModification { AttributeName = edit.Key, Type = LdapModificationType.Delete });
                 continue;
             }
 
             if (!_originalAttributes.TryGetValue(edit.Key, out var origValues))
             {
-                // New attribute - add each value
                 foreach (var val in values)
-                {
-                    mods.Add(new LdapModification
-                    {
-                        AttributeName = edit.Key,
-                        NewValue = val,
-                        Type = LdapModificationType.Add
-                    });
-                }
+                    mods.Add(new LdapModification { AttributeName = edit.Key, NewValue = val, Type = LdapModificationType.Add });
             }
             else if (!origValues.SequenceEqual(values))
             {
-                // Changed - use replace with each value
                 foreach (var val in values)
-                {
-                    mods.Add(new LdapModification
-                    {
-                        AttributeName = edit.Key,
-                        NewValue = val,
-                        Type = LdapModificationType.Replace
-                    });
-                }
+                    mods.Add(new LdapModification { AttributeName = edit.Key, NewValue = val, Type = LdapModificationType.Replace });
             }
         }
 
@@ -456,7 +586,6 @@
     private async Task DeleteEntry()
     {
         _error = null;
-
         try
         {
             await LdapService.DeleteEntry(Entry.Dn);
@@ -480,47 +609,27 @@
 
         foreach (var c in dn)
         {
-            if (escaped)
-            {
-                current.Append(c);
-                escaped = false;
-                continue;
-            }
-            if (c == '\\')
-            {
-                current.Append(c);
-                escaped = true;
-                continue;
-            }
+            if (escaped) { current.Append(c); escaped = false; continue; }
+            if (c == '\\') { current.Append(c); escaped = true; continue; }
             if (c == ',')
             {
-                if (current.Length > 0)
-                {
-                    segments.Add(current.ToString().Trim());
-                    current.Clear();
-                }
+                if (current.Length > 0) { segments.Add(current.ToString().Trim()); current.Clear(); }
                 continue;
             }
             current.Append(c);
         }
 
-        if (current.Length > 0)
-            segments.Add(current.ToString().Trim());
-
+        if (current.Length > 0) segments.Add(current.ToString().Trim());
         return segments;
     }
 
-    private static string BuildDnFromIndex(List<string> segments, int startIndex)
-    {
-        return string.Join(",", segments.Skip(startIndex));
-    }
+    private static string BuildDnFromIndex(List<string> segments, int startIndex) =>
+        string.Join(",", segments.Skip(startIndex));
 
     private async Task NavigateToDn(string dn)
     {
         if (OnNavigate.HasDelegate)
-        {
             await OnNavigate.InvokeAsync(dn);
-        }
     }
 
     private async Task CopyDn()

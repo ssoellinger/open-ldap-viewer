@@ -855,6 +855,71 @@
     color: #856404;
 }
 
+/* ==================== PASSWORD TOOL ==================== */
+.password-tool {
+    padding: 0.75rem;
+    background: #f0f8ff;
+    border: 1px solid #b8daff;
+    border-radius: 4px;
+}
+
+.password-preview {
+    background: #f8f9fa;
+    padding: 0.3rem 0.5rem;
+    border-radius: 3px;
+    border: 1px solid #dee2e6;
+}
+
+/* ==================== GROUP MANAGER ==================== */
+.group-manager {
+    padding: 0.75rem;
+    background: #f0fff0;
+    border: 1px solid #b8e6b8;
+    border-radius: 4px;
+}
+
+.group-search-results {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.group-search-item {
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.group-search-item:last-child {
+    border-bottom: none;
+}
+
+.group-member-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.group-member-item {
+    padding: 0.25rem 0.5rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.group-member-item:last-child {
+    border-bottom: none;
+}
+
+/* ==================== TOOL PANEL (Move/Rename) ==================== */
+.tool-panel {
+    padding: 0.75rem;
+    background: #f8f0ff;
+    border: 1px solid #d8b8ff;
+    border-radius: 4px;
+}
+
 /* ==================== DARK MODE - New Features ==================== */
 
 /* Dark Mode - Connection Tabs */
@@ -956,4 +1021,46 @@
     background-color: #332d00;
     border-color: #665a00;
     color: #ffc107;
+}
+
+/* Dark Mode - Password Tool */
+[data-theme="dark"] .password-tool {
+    background: #1a2744;
+    border-color: #0f3460;
+}
+
+[data-theme="dark"] .password-preview {
+    background: #0d1b3e;
+    border-color: #0f3460;
+    color: #e0e0e0;
+}
+
+/* Dark Mode - Group Manager */
+[data-theme="dark"] .group-manager {
+    background: #1a2e1a;
+    border-color: #2a5d2a;
+}
+
+[data-theme="dark"] .group-search-results {
+    background: #16213e;
+    border-color: #0f3460;
+}
+
+[data-theme="dark"] .group-search-item {
+    border-color: #0f3460;
+}
+
+[data-theme="dark"] .group-member-list {
+    background: #16213e;
+    border-color: #0f3460;
+}
+
+[data-theme="dark"] .group-member-item {
+    border-color: #0f3460;
+}
+
+/* Dark Mode - Tool Panel */
+[data-theme="dark"] .tool-panel {
+    background: #1e1a2e;
+    border-color: #3a2d60;
 }

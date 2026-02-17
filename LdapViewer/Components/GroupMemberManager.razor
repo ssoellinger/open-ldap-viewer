@@ -1,0 +1,277 @@
+@using LdapViewer.Models
+@using LdapViewer.Services
+
+<div class="group-manager">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <strong class="small">Mitglieder verwalten (@_members.Count)</strong>
+        <button class="btn btn-sm btn-outline-secondary py-0 px-1" @onclick="Close">X</button>
+    </div>
+
+    @* Add member search *@
+    <div class="mb-2">
+        <div class="input-group input-group-sm">
+            <input type="text" class="form-control" @bind="_searchQuery" @bind:event="oninput"
+                   @onkeydown="HandleSearchKey" placeholder="Benutzer suchen (Name, DN, uid...)" />
+            <button class="btn btn-primary" @onclick="SearchMembers" disabled="@_searching">
+                @if (_searching)
+                {
+                    <span class="spinner-border spinner-border-sm"></span>
+                }
+                else
+                {
+                    <span>Suchen</span>
+                }
+            </button>
+        </div>
+    </div>
+
+    @* Search results *@
+    @if (_searchResults != null && _searchResults.Count > 0)
+    {
+        <div class="group-search-results mb-2">
+            @foreach (var result in _searchResults)
+            {
+                var dn = result.Dn;
+                var alreadyMember = _members.Contains(dn, StringComparer.OrdinalIgnoreCase);
+                <div class="group-search-item d-flex justify-content-between align-items-center">
+                    <div class="small text-truncate flex-grow-1" title="@dn">
+                        <strong>@result.DisplayName</strong>
+                        <div class="text-muted" style="font-size: 0.7rem;">@dn</div>
+                    </div>
+                    @if (alreadyMember)
+                    {
+                        <span class="badge bg-secondary small">Mitglied</span>
+                    }
+                    else
+                    {
+                        <button class="btn btn-sm btn-outline-success flex-shrink-0" @onclick="() => AddMember(dn)">+</button>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger small py-1 px-2">@_error</div>
+    }
+    @if (!string.IsNullOrEmpty(_success))
+    {
+        <div class="alert alert-success small py-1 px-2">@_success</div>
+    }
+
+    @* Current members *@
+    <div class="group-member-list">
+        @if (_members.Count == 0)
+        {
+            <div class="text-muted small p-2">Keine Mitglieder.</div>
+        }
+        else
+        {
+            @foreach (var member in _members)
+            {
+                var memberDn = member;
+                <div class="group-member-item d-flex justify-content-between align-items-center">
+                    <span class="small text-truncate member-link flex-grow-1" @onclick="() => NavigateToMember(memberDn)" title="@memberDn">@GetRdn(memberDn)</span>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1 flex-shrink-0" @onclick="() => RemoveMember(memberDn)" title="Entfernen">X</button>
+                </div>
+            }
+        }
+    </div>
+
+    @* Add by DN directly *@
+    <div class="mt-2">
+        <div class="input-group input-group-sm">
+            <input type="text" class="form-control" @bind="_directDn" placeholder="DN direkt eingeben" />
+            <button class="btn btn-outline-primary" @onclick="AddDirectMember" disabled="@string.IsNullOrWhiteSpace(_directDn)">Hinzufuegen</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public LdapEntry Entry { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public LdapService LdapService { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnNavigate { get; set; }
+
+    private List<string> _members = new();
+    private string _memberAttribute = "member";
+    private string _searchQuery = "";
+    private List<LdapEntry>? _searchResults;
+    private bool _searching;
+    private string? _error;
+    private string? _success;
+    private string _directDn = "";
+
+    protected override void OnParametersSet()
+    {
+        DetectMemberAttribute();
+        LoadMembers();
+    }
+
+    private void DetectMemberAttribute()
+    {
+        var objectClasses = Entry.Attributes
+            .Where(a => a.Key.Equals("objectClass", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(a => a.Value)
+            .ToList();
+
+        if (objectClasses.Any(oc => oc.Equals("posixGroup", StringComparison.OrdinalIgnoreCase)))
+        {
+            _memberAttribute = "memberUid";
+        }
+        else if (objectClasses.Any(oc => oc.Equals("groupOfUniqueNames", StringComparison.OrdinalIgnoreCase)))
+        {
+            _memberAttribute = "uniqueMember";
+        }
+        else
+        {
+            _memberAttribute = "member";
+        }
+    }
+
+    private void LoadMembers()
+    {
+        _members = Entry.Attributes
+            .Where(a => a.Key.Equals(_memberAttribute, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(a => a.Value)
+            .ToList();
+    }
+
+    private async Task HandleSearchKey(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SearchMembers();
+    }
+
+    private async Task SearchMembers()
+    {
+        if (string.IsNullOrWhiteSpace(_searchQuery)) return;
+
+        _searching = true;
+        _error = null;
+        _searchResults = null;
+        StateHasChanged();
+
+        try
+        {
+            var q = _searchQuery.Trim();
+            string filter;
+            if (q.StartsWith("("))
+            {
+                filter = q;
+            }
+            else
+            {
+                var val = q.Contains('*') ? q : $"*{q}*";
+                filter = $"(|(cn={val})(uid={val})(sn={val})(givenName={val})(mail={val}))";
+            }
+
+            var baseDn = GetBaseDn();
+            _searchResults = await LdapService.Search(baseDn, filter);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _searching = false;
+        }
+    }
+
+    private string GetBaseDn()
+    {
+        // Use parent's parent or extract base from entry DN
+        var dn = Entry.Dn;
+        var parts = dn.Split(',');
+        if (parts.Length > 2)
+            return string.Join(",", parts.Skip(1));
+        return dn;
+    }
+
+    private async Task AddMember(string dn)
+    {
+        _error = null;
+        _success = null;
+
+        try
+        {
+            var mod = new LdapModification
+            {
+                AttributeName = _memberAttribute,
+                NewValue = dn,
+                Type = LdapModificationType.Add
+            };
+            await LdapService.ModifyEntry(Entry.Dn, [mod]);
+            _members.Add(dn);
+            _success = $"Mitglied hinzugefuegt.";
+            if (OnChanged.HasDelegate)
+                await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Fehler: {ex.Message}";
+        }
+    }
+
+    private async Task AddDirectMember()
+    {
+        if (string.IsNullOrWhiteSpace(_directDn)) return;
+        await AddMember(_directDn.Trim());
+        _directDn = "";
+    }
+
+    private async Task RemoveMember(string dn)
+    {
+        _error = null;
+        _success = null;
+
+        try
+        {
+            var mod = new LdapModification
+            {
+                AttributeName = _memberAttribute,
+                OldValue = dn,
+                Type = LdapModificationType.Delete
+            };
+            await LdapService.ModifyEntry(Entry.Dn, [mod]);
+            _members.Remove(dn);
+            _success = $"Mitglied entfernt.";
+            if (OnChanged.HasDelegate)
+                await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Fehler: {ex.Message}";
+        }
+    }
+
+    private async Task NavigateToMember(string dn)
+    {
+        if (OnNavigate.HasDelegate)
+            await OnNavigate.InvokeAsync(dn);
+    }
+
+    private async Task Close()
+    {
+        if (OnClose.HasDelegate)
+            await OnClose.InvokeAsync();
+    }
+
+    private static string GetRdn(string dn)
+    {
+        var idx = dn.IndexOf(',');
+        return idx > 0 ? dn[..idx] : dn;
+    }
+}

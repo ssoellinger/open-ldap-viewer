@@ -507,6 +507,88 @@ public class LdapService : IDisposable
         }
     }
 
+    public async Task MoveEntry(string dn, string newRdn, string? newParentDn)
+    {
+        if (_connection == null)
+            throw new InvalidOperationException("Nicht verbunden");
+
+        await _lock.WaitAsync();
+        try
+        {
+            await Task.Run(() =>
+            {
+                var request = new ModifyDNRequest(dn, newParentDn, newRdn);
+                _connection.SendRequest(request);
+            });
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task SetPassword(string dn, string password, string hashAlgorithm)
+    {
+        var hashedPassword = HashPassword(password, hashAlgorithm);
+        var mod = new LdapModification
+        {
+            AttributeName = "userPassword",
+            NewValue = hashedPassword,
+            Type = LdapModificationType.Replace
+        };
+        await ModifyEntry(dn, [mod]);
+    }
+
+    public static string HashPassword(string password, string algorithm)
+    {
+        var bytes = Encoding.UTF8.GetBytes(password);
+
+        switch (algorithm.ToUpperInvariant())
+        {
+            case "SSHA":
+            {
+                var salt = new byte[8];
+                using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+                rng.GetBytes(salt);
+                using var sha = System.Security.Cryptography.SHA1.Create();
+                var combined = new byte[bytes.Length + salt.Length];
+                Buffer.BlockCopy(bytes, 0, combined, 0, bytes.Length);
+                Buffer.BlockCopy(salt, 0, combined, bytes.Length, salt.Length);
+                var hash = sha.ComputeHash(combined);
+                var result = new byte[hash.Length + salt.Length];
+                Buffer.BlockCopy(hash, 0, result, 0, hash.Length);
+                Buffer.BlockCopy(salt, 0, result, hash.Length, salt.Length);
+                return "{SSHA}" + Convert.ToBase64String(result);
+            }
+            case "SHA":
+            {
+                using var sha = System.Security.Cryptography.SHA1.Create();
+                var hash = sha.ComputeHash(bytes);
+                return "{SHA}" + Convert.ToBase64String(hash);
+            }
+            case "SHA256":
+            {
+                using var sha = System.Security.Cryptography.SHA256.Create();
+                var hash = sha.ComputeHash(bytes);
+                return "{SHA256}" + Convert.ToBase64String(hash);
+            }
+            case "SHA512":
+            {
+                using var sha = System.Security.Cryptography.SHA512.Create();
+                var hash = sha.ComputeHash(bytes);
+                return "{SHA512}" + Convert.ToBase64String(hash);
+            }
+            case "MD5":
+            {
+                using var md5 = System.Security.Cryptography.MD5.Create();
+                var hash = md5.ComputeHash(bytes);
+                return "{MD5}" + Convert.ToBase64String(hash);
+            }
+            default: // cleartext
+                return password;
+        }
+    }
+
     public async Task DeleteEntry(string dn)
     {
         if (_connection == null)

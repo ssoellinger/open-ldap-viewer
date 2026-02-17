@@ -206,16 +206,42 @@ else
             {
                 <div class="search-results-panel">
                     <div class="search-results-list">
-                        <div class="small text-muted p-2 d-flex justify-content-between align-items-center">
-                            <span>@_searchResults.Count Ergebnis(se)</span>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="ExportSearchLdif" title="Ergebnisse als LDIF">LDIF</button>
+                        <div class="small text-muted p-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span>@_searchResults.Count Ergebnis(se)</span>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="ExportSearchLdif" title="Ergebnisse als LDIF">LDIF</button>
+                            </div>
+                            @if (_bulkSelected.Count > 0)
+                            {
+                                <div class="d-flex gap-1 align-items-center">
+                                    <span class="small fw-bold">@_bulkSelected.Count ausgewaehlt</span>
+                                    <button class="btn btn-sm btn-outline-danger py-0 px-1" @onclick="BulkDelete" disabled="@_bulkDeleting" title="Ausgewaehlte loeschen">
+                                        @if (_bulkDeleting)
+                                        {
+                                            <span class="spinner-border spinner-border-sm"></span>
+                                        }
+                                        else
+                                        {
+                                            <span>Loeschen</span>
+                                        }
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary py-0 px-1" @onclick="() => _bulkSelected.Clear()">Keine</button>
+                                </div>
+                            }
                         </div>
                         @foreach (var result in _searchResults)
                         {
-                            <div class="search-result-item @(result.Dn == _selectedDn ? "active" : "")"
-                                 @onclick="() => SelectSearchResult(result.Dn)">
-                                <div class="small fw-bold">@result.DisplayName</div>
-                                <div class="search-result-dn">@result.Dn</div>
+                            var resultDn = result.Dn;
+                            <div class="search-result-item @(result.Dn == _selectedDn ? "active" : "")">
+                                <div class="d-flex align-items-start gap-1">
+                                    <input type="checkbox" class="form-check-input mt-1 flex-shrink-0"
+                                           checked="@_bulkSelected.Contains(resultDn)"
+                                           @onchange="() => ToggleBulkSelect(resultDn)" />
+                                    <div class="flex-grow-1" @onclick="() => SelectSearchResult(resultDn)" style="cursor: pointer;">
+                                        <div class="small fw-bold">@result.DisplayName</div>
+                                        <div class="search-result-dn">@result.Dn</div>
+                                    </div>
+                                </div>
                             </div>
                         }
                     </div>
@@ -229,7 +255,8 @@ else
                                              OnNavigate="HandleBreadcrumbNavigate"
                                              OnDeleted="HandleEntryDeleted"
                                              OnModified="HandleEntryModified"
-                                             OnCopy="HandleCopyEntry" />
+                                             OnCopy="HandleCopyEntry"
+                                             OnMoved="HandleEntryMoved" />
                         }
                         else
                         {
@@ -247,7 +274,8 @@ else
                                  OnNavigate="HandleBreadcrumbNavigate"
                                  OnDeleted="HandleEntryDeleted"
                                  OnModified="HandleEntryModified"
-                                 OnCopy="HandleCopyEntry" />
+                                 OnCopy="HandleCopyEntry"
+                                 OnMoved="HandleEntryMoved" />
             }
             else
             {
@@ -277,6 +305,10 @@ else
     private List<LdapEntry>? _searchResults;
     private string? _searchError;
     private bool _searching;
+
+    // Bulk operations
+    private HashSet<string> _bulkSelected = new();
+    private bool _bulkDeleting;
 
     // Search History
     private List<SearchHistoryItem> _searchHistory = new();
@@ -374,6 +406,51 @@ else
         _searchResults = null;
     }
 
+    // Bulk operations
+    private void ToggleBulkSelect(string dn)
+    {
+        if (!_bulkSelected.Remove(dn))
+            _bulkSelected.Add(dn);
+    }
+
+    private async Task BulkDelete()
+    {
+        if (_bulkSelected.Count == 0) return;
+
+        _bulkDeleting = true;
+        StateHasChanged();
+
+        var errors = new List<string>();
+        foreach (var dn in _bulkSelected.ToList())
+        {
+            try
+            {
+                await ConnMgr.Active!.DeleteEntry(dn);
+                _searchResults?.RemoveAll(e => e.Dn == dn);
+                _bulkSelected.Remove(dn);
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{dn}: {ex.Message}");
+            }
+        }
+
+        _bulkDeleting = false;
+        _treeVersion++;
+        await LoadRootEntries();
+
+        if (errors.Count > 0)
+            _searchError = $"{errors.Count} Fehler beim Loeschen: {errors[0]}";
+
+        if (_selectedDn != null && !(_searchResults?.Any(r => r.Dn == _selectedDn) ?? false))
+        {
+            _selectedDn = null;
+            _selectedEntry = null;
+        }
+
+        StateHasChanged();
+    }
+
     // Delete/Modify callbacks
     private async Task HandleEntryDeleted()
     {
@@ -387,6 +464,13 @@ else
     {
         _selectedEntry = updatedEntry;
         StateHasChanged();
+    }
+
+    private async Task HandleEntryMoved(string newDn)
+    {
+        _treeVersion++;
+        await LoadRootEntries();
+        await HandleTreeSelect(newDn);
     }
 
     // Search History
