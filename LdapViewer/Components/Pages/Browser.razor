@@ -473,14 +473,24 @@ else
         try
         {
             var baseDn = ConnMgr.Settings!.BaseDn;
-            var baseEntry = await ConnMgr.Active!.GetEntry(baseDn);
-            if (baseEntry != null)
+
+            if (string.IsNullOrWhiteSpace(baseDn))
             {
-                _rootEntries = [baseEntry];
+                // No BaseDn at all - show all naming contexts as roots
+                var contexts = await Task.Run(() => ConnMgr.Active!.GetNamingContexts());
+                var entries = new List<LdapEntry>();
+                foreach (var ctx in contexts)
+                {
+                    var entry = await ConnMgr.Active!.GetEntry(ctx);
+                    if (entry != null)
+                        entries.Add(entry);
+                }
+                _rootEntries = entries;
             }
             else
             {
-                _rootEntries = [];
+                var baseEntry = await ConnMgr.Active!.GetEntry(baseDn);
+                _rootEntries = baseEntry != null ? [baseEntry] : [];
             }
         }
         catch (Exception ex)

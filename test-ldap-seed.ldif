@@ -1,0 +1,42 @@
+dn: ou=People,dc=test,dc=local
+objectClass: organizationalUnit
+ou: People
+
+dn: ou=Groups,dc=test,dc=local
+objectClass: organizationalUnit
+ou: Groups
+
+dn: cn=Alice Mueller,ou=People,dc=test,dc=local
+objectClass: inetOrgPerson
+cn: Alice Mueller
+sn: Mueller
+givenName: Alice
+mail: alice@test.local
+uid: amueller
+
+dn: cn=Bob Schmidt,ou=People,dc=test,dc=local
+objectClass: inetOrgPerson
+cn: Bob Schmidt
+sn: Schmidt
+givenName: Bob
+mail: bob@test.local
+uid: bschmidt
+
+dn: cn=Clara Weber,ou=People,dc=test,dc=local
+objectClass: inetOrgPerson
+cn: Clara Weber
+sn: Weber
+givenName: Clara
+mail: clara@test.local
+uid: cweber
+
+dn: cn=Developers,ou=Groups,dc=test,dc=local
+objectClass: groupOfNames
+cn: Developers
+member: cn=Alice Mueller,ou=People,dc=test,dc=local
+member: cn=Bob Schmidt,ou=People,dc=test,dc=local
+
+dn: cn=Admins,ou=Groups,dc=test,dc=local
+objectClass: groupOfNames
+cn: Admins
+member: cn=Clara Weber,ou=People,dc=test,dc=local

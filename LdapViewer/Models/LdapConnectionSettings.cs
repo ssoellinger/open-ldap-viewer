@@ -12,7 +12,6 @@ public class LdapConnectionSettings
     [Range(1, 65535, ErrorMessage = "Port muss zwischen 1 und 65535 liegen")]
     public int Port { get; set; } = 389;
 
-    [Required(ErrorMessage = "Base DN ist erforderlich")]
     public string BaseDn { get; set; } = string.Empty;
 
     public string? Username { get; set; }

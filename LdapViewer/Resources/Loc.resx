@@ -134,6 +134,15 @@
   <data name="Home_BindFailed" xml:space="preserve">
     <value>Bind fehlgeschlagen: {0}</value>
   </data>
+  <data name="Home_BaseDnOptional" xml:space="preserve">
+    <value>optional</value>
+  </data>
+  <data name="Home_BaseDnAutoDiscover" xml:space="preserve">
+    <value>Leer lassen fuer automatische Erkennung vom Server.</value>
+  </data>
+  <data name="Home_BaseDnDiscovered" xml:space="preserve">
+    <value>Base DN automatisch erkannt: {0}</value>
+  </data>
 
   <!-- Browser Page -->
   <data name="PageTitle_Browser" xml:space="preserve">

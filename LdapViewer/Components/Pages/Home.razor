@@ -67,9 +67,9 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">@L["Home_BaseDn"]</label>
+                            <label class="form-label">@L["Home_BaseDn"] <small class="text-muted">(@L["Home_BaseDnOptional"])</small></label>
                             <InputText class="form-control" @bind-Value="_settings.BaseDn" placeholder="dc=example,dc=com" />
-                            <ValidationMessage For="@(() => _settings.BaseDn)" />
+                            <small class="form-text text-muted">@L["Home_BaseDnAutoDiscover"]</small>
                         </div>
 
                         <div class="mb-3">
@@ -90,6 +90,14 @@
                         @if (_testSuccess)
                         {
                             <div class="alert alert-success">@L["Home_ConnectionSuccess"]</div>
+                        }
+
+                        @if (!string.IsNullOrEmpty(_autoDiscoveredBaseDn))
+                        {
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-1"></i>
+                                @string.Format(L["Home_BaseDnDiscovered"], _autoDiscoveredBaseDn)
+                            </div>
                         }
 
                         <div class="d-flex gap-2">
@@ -164,6 +172,7 @@
     private bool _connecting;
     private bool _testing;
     private bool _testSuccess;
+    private string? _autoDiscoveredBaseDn;
 
     // Password check
     private string _testUserDn = "";
@@ -289,12 +298,20 @@
     private async Task HandleConnect()
     {
         _errorMessage = null;
+        _autoDiscoveredBaseDn = null;
         _connecting = true;
         StateHasChanged();
 
         try
         {
+            var baseDnBefore = _settings.BaseDn;
             await Task.Run(() => ConnMgr.AddConnection(_settings));
+
+            if (string.IsNullOrWhiteSpace(baseDnBefore) && !string.IsNullOrWhiteSpace(_settings.BaseDn))
+            {
+                _autoDiscoveredBaseDn = _settings.BaseDn;
+            }
+
             await SaveConnection();
             await JS.InvokeVoidAsync("connectionStorage.saveLastConnection",
                 JsonSerializer.Serialize(_settings));

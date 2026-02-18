@@ -25,6 +25,13 @@ public class ConnectionManager : IDisposable
         var service = new LdapService();
         service.Connect(settings);
 
+        if (string.IsNullOrWhiteSpace(settings.BaseDn))
+        {
+            var contexts = service.GetNamingContexts();
+            if (contexts.Count > 0)
+                settings.BaseDn = contexts[0];
+        }
+
         _connections[id] = service;
         _connectionNames[id] = !string.IsNullOrWhiteSpace(settings.Name)
             ? settings.Name

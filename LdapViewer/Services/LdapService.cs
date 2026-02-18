@@ -141,6 +141,41 @@ public class LdapService : IDisposable
         });
     }
 
+    public List<string> GetNamingContexts()
+    {
+        var conn = EnsureConnected();
+        var request = new SearchRequest("", "(objectClass=*)", SearchScope.Base,
+            ["namingContexts", "defaultNamingContext"]);
+        var response = (SearchResponse)conn.SendRequest(request);
+
+        string? defaultContext = null;
+        var contexts = new List<string>();
+
+        if (response.Entries.Count > 0)
+        {
+            var entry = response.Entries[0];
+
+            if (entry.Attributes.Contains("defaultNamingContext"))
+                defaultContext = (string)entry.Attributes["defaultNamingContext"][0];
+
+            if (entry.Attributes.Contains("namingContexts"))
+            {
+                var attr = entry.Attributes["namingContexts"];
+                for (int i = 0; i < attr.Count; i++)
+                    contexts.Add((string)attr[i]);
+            }
+        }
+
+        // Put defaultNamingContext first if available
+        if (defaultContext != null)
+        {
+            contexts.Remove(defaultContext);
+            contexts.Insert(0, defaultContext);
+        }
+
+        return contexts;
+    }
+
     public async Task<LdapSchema> GetSchema()
     {
         return await WithConnection(conn =>
