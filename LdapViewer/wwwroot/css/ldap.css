@@ -226,6 +226,16 @@
     color: var(--text-active-muted);
 }
 
+.tree-load-more {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.tree-load-more:hover {
+    text-decoration: underline;
+}
+
 /* ==================== SEARCH ==================== */
 .search-bar {
     padding: 0.5rem;

@@ -78,7 +78,7 @@ public class LdapService : IDisposable
     {
         return await WithConnection(conn =>
         {
-            return PagedSearch(conn, parentDn, "(objectClass=*)", SearchScope.OneLevel, null)
+            return PagedSearch(conn, parentDn, "(objectClass=*)", SearchScope.OneLevel, ["1.1"])
                 .Select(MapEntry)
                 .OrderBy(e => e.DisplayName)
                 .ToList();
@@ -90,6 +90,17 @@ public class LdapService : IDisposable
         return await WithConnection(conn =>
         {
             return PagedSearch(conn, parentDn, "(objectClass=*)", SearchScope.OneLevel, ["1.1"]).Count;
+        });
+    }
+
+    public async Task<bool> HasChildren(string parentDn)
+    {
+        return await WithConnection(conn =>
+        {
+            var request = new SearchRequest(parentDn, "(objectClass=*)", SearchScope.OneLevel, ["1.1"]);
+            request.SizeLimit = 1;
+            var response = (SearchResponse)conn.SendRequest(request);
+            return response.Entries.Count > 0;
         });
     }
 
@@ -602,7 +613,7 @@ public class LdapService : IDisposable
         return sb.ToString();
     }
 
-    private static List<SearchResultEntry> PagedSearch(LdapConnection conn, string baseDn, string filter, SearchScope scope, string[]? attributes, int pageSize = 500)
+    private static List<SearchResultEntry> PagedSearch(LdapConnection conn, string baseDn, string filter, SearchScope scope, string[]? attributes, int pageSize = 1000)
     {
         var results = new List<SearchResultEntry>();
         var request = new SearchRequest(baseDn, filter, scope, attributes);

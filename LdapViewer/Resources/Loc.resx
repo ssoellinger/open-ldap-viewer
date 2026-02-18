@@ -734,6 +734,9 @@
   <data name="Tree_Loading" xml:space="preserve">
     <value>Lade...</value>
   </data>
+  <data name="Tree_LoadMore" xml:space="preserve">
+    <value>{0} weitere Eintraege...</value>
+  </data>
 
   <!-- Autocomplete -->
   <data name="Autocomplete_Placeholder" xml:space="preserve">

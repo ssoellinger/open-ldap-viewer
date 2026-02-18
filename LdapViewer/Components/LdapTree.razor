@@ -25,7 +25,7 @@
     @if (_expanded && _children != null && _children.Count > 0)
     {
         <div class="tree-children">
-            @foreach (var child in _children)
+            @foreach (var child in _children.Take(_visibleCount))
             {
                 <LdapTree @key="child.Dn"
                           @ref="_childRefs[child.Dn]"
@@ -34,6 +34,12 @@
                           SelectedDn="@SelectedDn"
                           OnSelect="OnSelect"
                           OnContextMenu="OnContextMenu" />
+            }
+            @if (_visibleCount < _children.Count)
+            {
+                <div class="tree-load-more" @onclick="LoadMore">
+                    <span class="text-muted">@string.Format(L["Tree_LoadMore"], _children.Count - _visibleCount)</span>
+                </div>
             }
         </div>
     }
@@ -54,6 +60,8 @@
 </div>
 
 @code {
+    private const int PageSize = 200;
+
     [Parameter, EditorRequired]
     public LdapEntry Entry { get; set; } = default!;
 
@@ -77,6 +85,7 @@
     private bool _isLeaf;
     private string? _error;
     private int _childCount;
+    private int _visibleCount = PageSize;
     private List<LdapEntry>? _children;
     private Dictionary<string, LdapTree> _childRefs = new();
     private bool _isSelected => SelectedDn == Entry.Dn;
@@ -97,8 +106,8 @@
             _countLoaded = true;
             try
             {
-                _childCount = await LdapService.GetChildCount(Entry.Dn);
-                if (_childCount == 0)
+                var hasChildren = await LdapService.HasChildren(Entry.Dn);
+                if (!hasChildren)
                     _isLeaf = true;
                 StateHasChanged();
             }
@@ -144,6 +153,7 @@
 
         if (_children == null) return;
 
+        _visibleCount = _children.Count;
         StateHasChanged();
         await Task.Delay(1);
 
@@ -168,6 +178,11 @@
         StateHasChanged();
     }
 
+    private void LoadMore()
+    {
+        _visibleCount += PageSize;
+    }
+
     private async Task Expand()
     {
         if (_isLeaf) return;
@@ -185,6 +200,7 @@
                 _children = await LdapService.GetChildren(Entry.Dn);
                 _childCount = _children.Count;
                 _countLoaded = true;
+                _visibleCount = PageSize;
                 if (_children.Count == 0)
                 {
                     _isLeaf = true;
