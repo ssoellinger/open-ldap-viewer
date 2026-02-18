@@ -78,11 +78,7 @@ public class LdapService : IDisposable
     {
         return await WithConnection(conn =>
         {
-            var request = new SearchRequest(parentDn, "(objectClass=*)", SearchScope.OneLevel, null);
-            request.SizeLimit = 1000;
-
-            var response = (SearchResponse)conn.SendRequest(request);
-            return response.Entries.Cast<SearchResultEntry>()
+            return PagedSearch(conn, parentDn, "(objectClass=*)", SearchScope.OneLevel, null)
                 .Select(MapEntry)
                 .OrderBy(e => e.DisplayName)
                 .ToList();
@@ -93,11 +89,7 @@ public class LdapService : IDisposable
     {
         return await WithConnection(conn =>
         {
-            var request = new SearchRequest(parentDn, "(objectClass=*)", SearchScope.OneLevel, ["1.1"]);
-            request.SizeLimit = 1000;
-
-            var response = (SearchResponse)conn.SendRequest(request);
-            return response.Entries.Count;
+            return PagedSearch(conn, parentDn, "(objectClass=*)", SearchScope.OneLevel, ["1.1"]).Count;
         });
     }
 
@@ -115,11 +107,7 @@ public class LdapService : IDisposable
     {
         return await WithConnection(conn =>
         {
-            var request = new SearchRequest(baseDn, filter, SearchScope.Subtree, null);
-            request.SizeLimit = 500;
-
-            var response = (SearchResponse)conn.SendRequest(request);
-            return response.Entries.Cast<SearchResultEntry>()
+            return PagedSearch(conn, baseDn, filter, SearchScope.Subtree, null)
                 .Select(MapEntry)
                 .OrderBy(e => e.Dn)
                 .ToList();
@@ -130,11 +118,7 @@ public class LdapService : IDisposable
     {
         return await WithConnection(conn =>
         {
-            var request = new SearchRequest(baseDn, "(objectClass=*)", SearchScope.Subtree, null);
-            request.SizeLimit = 5000;
-
-            var response = (SearchResponse)conn.SendRequest(request);
-            return response.Entries.Cast<SearchResultEntry>()
+            return PagedSearch(conn, baseDn, "(objectClass=*)", SearchScope.Subtree, null)
                 .Select(MapEntry)
                 .OrderBy(e => e.Dn)
                 .ToList();
@@ -288,13 +272,10 @@ public class LdapService : IDisposable
     {
         return await WithConnection(conn =>
         {
-            var request = new SearchRequest(baseDn, "(objectClass=*)", SearchScope.Subtree, ["objectClass"]);
-            request.SizeLimit = 10000;
-
-            var response = (SearchResponse)conn.SendRequest(request);
+            var entries = PagedSearch(conn, baseDn, "(objectClass=*)", SearchScope.Subtree, ["objectClass"]);
             var stats = new Dictionary<string, int>();
 
-            foreach (SearchResultEntry entry in response.Entries)
+            foreach (SearchResultEntry entry in entries)
             {
                 if (entry.Attributes.Contains("objectClass"))
                 {
@@ -315,13 +296,10 @@ public class LdapService : IDisposable
     {
         return await WithConnection(conn =>
         {
-            var request = new SearchRequest(baseDn, "(objectClass=*)", SearchScope.Subtree, ["1.1"]);
-            request.SizeLimit = 10000;
-
-            var response = (SearchResponse)conn.SendRequest(request);
+            var entries = PagedSearch(conn, baseDn, "(objectClass=*)", SearchScope.Subtree, ["1.1"]);
             var ouStats = new Dictionary<string, int>();
 
-            foreach (SearchResultEntry entry in response.Entries)
+            foreach (SearchResultEntry entry in entries)
             {
                 var dn = entry.DistinguishedName;
                 foreach (var part in dn.Split(','))
@@ -622,6 +600,33 @@ public class LdapService : IDisposable
             sb.AppendLine();
         }
         return sb.ToString();
+    }
+
+    private static List<SearchResultEntry> PagedSearch(LdapConnection conn, string baseDn, string filter, SearchScope scope, string[]? attributes, int pageSize = 500)
+    {
+        var results = new List<SearchResultEntry>();
+        var request = new SearchRequest(baseDn, filter, scope, attributes);
+        var pageControl = new PageResultRequestControl(pageSize);
+        request.Controls.Add(pageControl);
+
+        while (true)
+        {
+            var response = (SearchResponse)conn.SendRequest(request);
+
+            foreach (SearchResultEntry entry in response.Entries)
+                results.Add(entry);
+
+            var responseControl = response.Controls
+                .OfType<PageResultResponseControl>()
+                .FirstOrDefault();
+
+            if (responseControl == null || responseControl.Cookie.Length == 0)
+                break;
+
+            pageControl.Cookie = responseControl.Cookie;
+        }
+
+        return results;
     }
 
     private static LdapEntry MapEntry(SearchResultEntry resultEntry)
